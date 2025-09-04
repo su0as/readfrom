@@ -48,7 +48,9 @@ export async function isEntitled(email?: string | null): Promise<boolean> {
   const rec = await getEntitlement(email);
   if (!rec) return false;
   if (rec.status !== "active") return false;
-  if (rec.periodEnd && Date.now() > rec.periodEnd) return false;
+  // periodEnd may be seconds or ms depending on source; normalize to ms for comparison
+  const pe = typeof rec.periodEnd === "number" ? (rec.periodEnd < 1e12 ? rec.periodEnd * 1000 : rec.periodEnd) : undefined;
+  if (pe && Date.now() > pe) return false;
   return true;
 }
 

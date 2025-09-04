@@ -58,8 +58,15 @@ function extractPeriodEndMs(payload: any): number | undefined {
     get(payload, ["subscription", "current_period_end"]),
   ];
   for (const v of candidates) {
-    if (typeof v === "number") return v;
-    if (typeof v === "string" && v && !Number.isNaN(Number(v))) return Number(v);
+    if (typeof v === "number") {
+      const n = v < 1e12 ? v * 1000 : v; // normalize seconds -> ms
+      return n;
+    }
+    if (typeof v === "string" && v && !Number.isNaN(Number(v))) {
+      const n = Number(v);
+      const nms = n < 1e12 ? n * 1000 : n;
+      return nms;
+    }
   }
   return undefined;
 }
