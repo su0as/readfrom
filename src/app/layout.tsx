@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   description: "ReadFrom: Focused text-to-speech reader with word-level highlighting.",
 };
 
+// Force dynamic rendering for the root segment to avoid prerendering the client-only reader page.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{
