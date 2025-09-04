@@ -4,6 +4,7 @@ import { z } from "zod";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import * as mm from "music-metadata";
 import { limitByIP } from "@/utils/rateLimit";
+import { isEntitled } from "@/utils/entitlements";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,9 @@ const RequestSchema = z.object({
   maxChunks: z.number().int().min(1).optional(),
   includeMarks: z.boolean().default(false).optional(),
   includeDurations: z.boolean().default(false).optional(),
+  // Preview options (server may enforce regardless of client input if not entitled)
+  previewSec: z.number().int().min(1).max(600).optional(),
+  preview: z.boolean().optional(),
 });
 
 function languageCodeForVoice(name: string): string {
@@ -128,7 +132,7 @@ function chunkBySentences(tokens: { t: "word" | "sep"; v: string; wi?: number }[
   const chunks: { startWord: number; endWord: number; ssml: string }[] = [];
   let i = 0;
   while (i < sents.length) {
-    let start = sents[i].startWord;
+    const start = sents[i].startWord;
     let end = sents[i].endWord;
     let ssml = buildSSML(tokens, start, end);
     let bytes = Buffer.byteLength(ssml);
@@ -244,6 +248,8 @@ function fallbackVoiceForLanguage(lang: string) {
 
 const DEBUG_TTS = !!process.env.DEBUG_TTS;
 
+const PREVIEW_SECONDS_DEFAULT = Number(process.env.PREVIEW_SECONDS || "30");
+
 export async function POST(req: NextRequest) {
   if (req.method !== "POST") return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
   const origin = req.headers.get("origin");
@@ -258,7 +264,7 @@ export async function POST(req: NextRequest) {
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { text, voice, speed, format, container, startChunk = 0, maxChunks, includeMarks = false, includeDurations = false } = parsed.data as unknown as { text: string; voice: string; speed: number; format: "bundle" | "audio" | "marks"; container: "ogg" | "mp3"; startChunk?: number; maxChunks?: number; includeMarks?: boolean; includeDurations?: boolean };
+  const { text, voice, speed, format, container, startChunk = 0, maxChunks, includeMarks = false, includeDurations = false, previewSec, preview } = parsed.data as unknown as { text: string; voice: string; speed: number; format: "bundle" | "audio" | "marks"; container: "ogg" | "mp3"; startChunk?: number; maxChunks?: number; includeMarks?: boolean; includeDurations?: boolean; previewSec?: number; preview?: boolean };
 
   // Validate env early (helps client show a friendly message)
   if (!process.env.GOOGLE_PROJECT_ID || !process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
@@ -266,6 +272,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Determine entitlement from cookie-bound email (best-effort)
+    const email = req.cookies.get("rf_email")?.value || null;
+    const entitled = await isEntitled(email);
+    const effectivePreviewSec = entitled ? 0 : (typeof previewSec === 'number' ? previewSec : (preview ? PREVIEW_SECONDS_DEFAULT : 0));
     if (DEBUG_TTS) console.log("[TTS] request: voice=%s speed=%s len=%d format=%s", voice, speed, text.length, format);
     // Prepare Google TTS client
     const client = new TextToSpeechClient({
@@ -307,7 +317,7 @@ export async function POST(req: NextRequest) {
           ? Buffer.from(audioContent, "base64")
           : Buffer.from(audioContent);
         let durationMs = 0;
-        if (includeDurations) {
+        if (includeDurations || effectivePreviewSec > 0) {
           try {
             const meta = await mm.parseBuffer(buf, { mimeType: metaMime });
             durationMs = Math.round((meta.format.duration || 0) * 1000);
@@ -315,6 +325,10 @@ export async function POST(req: NextRequest) {
         }
         segments.push({ idx: i, audioBase64: buf.toString("base64"), durationMs, mime: targetMime });
         if (DEBUG_TTS) console.log("[TTS] audio seg %d dur=%dms bytes=%d", i, durationMs, buf.byteLength);
+        if (effectivePreviewSec > 0) {
+          const soFar = segments.reduce((a, s) => a + Math.max(0, s.durationMs || 0), 0);
+          if (soFar >= effectivePreviewSec * 1000) break;
+        }
       }
       return NextResponse.json({ segments, chunkStart: start, chunkEnd: endExclusive, totalChunks, totalWords });
     }
@@ -426,7 +440,7 @@ export async function POST(req: NextRequest) {
           ? Buffer.from(tgtAudioContent, "base64")
           : Buffer.from(tgtAudioContent);
         let tgtDurationMs = 0;
-        if (includeDurations) {
+        if (includeDurations || effectivePreviewSec > 0) {
           try {
             const metaT = await mm.parseBuffer(tgtBuf, { mimeType: metaMime });
             tgtDurationMs = Math.round((metaT.format.duration || 0) * 1000);
@@ -448,6 +462,7 @@ export async function POST(req: NextRequest) {
         segments.push({ idx: i, audioBase64: tgtBuf.toString("base64"), durationMs: chunkDur, startWordIndex: c.startWord, mime: targetMime });
         if (DEBUG_TTS) console.log("[TTS] chunk %d: refDur=%dms tgtDur=%dms chunkDur=%dms marks=%d", i, refDurationMs, tgtDurationMs, chunkDur, count);
         offsetMs += chunkDur;
+        if (effectivePreviewSec > 0 && offsetMs >= effectivePreviewSec * 1000) break;
       } else {
         // Non-Chirp voices: regular SSML marks on target voice
         const useOgg = container === "ogg";
@@ -475,7 +490,7 @@ export async function POST(req: NextRequest) {
           : Buffer.from(audioContent);
 
         let durationMs = 0;
-        if (includeDurations) {
+        if (includeDurations || effectivePreviewSec > 0) {
           try {
             const meta = await mm.parseBuffer(audioBuf, { mimeType: metaMime });
             durationMs = Math.round((meta.format.duration || 0) * 1000);
@@ -497,6 +512,7 @@ export async function POST(req: NextRequest) {
         segments.push({ idx: i, audioBase64: audioBuf.toString("base64"), durationMs, startWordIndex: c.startWord, mime: targetMime });
         if (DEBUG_TTS) console.log("[TTS] chunk %d: duration=%dms marks=%d", i, durationMs, count);
         offsetMs += durationMs;
+        if (effectivePreviewSec > 0 && offsetMs >= effectivePreviewSec * 1000) break;
       }
     }
 

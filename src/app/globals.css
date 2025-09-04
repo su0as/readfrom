@@ -74,5 +74,5 @@ select, input[type="range"] { color: inherit; }
 /* Top loading bar */
 .progress { position: fixed; top: 0; left: 0; height: 3px; width: 100%; background: transparent; z-index: 60; }
 .progress .bar { height: 100%; width: 0; background: var(--fg); transition: width 0.2s ease; }
-.progress.active .bar { width: 80%; animation: indet 1.2s infinite; }
-@keyframes indet { 0% { width: 10%; transform: translateX(0%);} 50% { width: 60%; transform: translateX(40%);} 100% { width: 10%; transform: translateX(100%);} }
+/* Determinate mode: rely on inline width for left-to-right fill */
+.progress.active .bar { animation: none; }

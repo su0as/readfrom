@@ -30,6 +30,12 @@ function classNames(...xs: Array<string | false | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+// Yield to the browser to allow a paint before continuing heavy work
+const nextFrame = () => new Promise<void>((resolve) => {
+  if (typeof window === 'undefined') return resolve();
+  requestAnimationFrame(() => resolve());
+});
+
 export default function Home() {
   // UI state (SSR-safe defaults; hydrate from localStorage after mount)
   const [theme, setTheme] = useState<string>('white');
@@ -82,6 +88,19 @@ export default function Home() {
   const [previewLoading, setPreviewLoading] = useState<boolean>(false);
   const [readAnim, setReadAnim] = useState<boolean>(false);
 
+  // Billing/entitlement
+  const [entitled, setEntitled] = useState<boolean>(false);
+  const entitledRef = useRef<boolean>(false);
+  useEffect(() => { entitledRef.current = entitled; }, [entitled]);
+  const [email, setEmail] = useState<string>("");
+  const [showPay, setShowPay] = useState<boolean>(false);
+  const [linkEmail, setLinkEmail] = useState<string>("");
+  const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
+  const previewTimerRef = useRef<number | null>(null);
+
+  // Progress ramp timer for determinate bar while awaiting server
+  const rampTimerRef = useRef<number | null>(null);
+
   // Mirror isPlaying in a ref for event handlers
   const isPlayingRef = useRef<boolean>(false);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -119,6 +138,11 @@ export default function Home() {
       const ra = localStorage.getItem('rf_readAnim'); if (ra === '1' || ra === '0') setReadAnim(ra === '1');
       // theme is handled in separate hydration effect above
     } catch {}
+    // Fetch entitlement status
+    fetch('/api/entitlements').then(r => r.json()).then((j) => {
+      if (j?.email) setEmail(j.email);
+      if (j?.entitled) setEntitled(true);
+    }).catch(() => {});
   }, []);
 
   // Persist text/settings
@@ -238,7 +262,7 @@ export default function Home() {
     wordsPerSegRef.current = wordsPer;
   }, [probeDurations]);
 
-  const prepareRequest = useCallback(async (opts?: { voice?: string; speed?: number; text?: string; container?: 'ogg' | 'mp3'; progressive?: boolean }) => {
+  const prepareRequest = useCallback(async (opts?: { voice?: string; speed?: number; text?: string; container?: 'ogg' | 'mp3'; progressive?: boolean; preview?: boolean }) => {
     const v = opts?.voice ?? voice;
     const sp = opts?.speed ?? speed;
     const ttxt = opts?.text ?? text;
@@ -252,18 +276,38 @@ export default function Home() {
 
     setLoading(true);
     setProgress(0.05);
-    let pHandle: number | null = null;
+    // Start a time-based ramp up to ~70% while waiting for the server
+    if (typeof window !== 'undefined') {
+      if (rampTimerRef.current) { clearInterval(rampTimerRef.current); rampTimerRef.current = null; }
+      const start = Date.now();
+      const BASE = 0.05; // initial progress
+      const LIMIT = 0.7; // max before response
+      const DURATION = 9000; // ms to reach LIMIT if server is slow
+      rampTimerRef.current = window.setInterval(() => {
+        const t = Date.now() - start;
+        const ratio = Math.max(0, Math.min(1, t / DURATION));
+        const target = BASE + ratio * (LIMIT - BASE);
+        setProgress((v) => (v < target ? target : v));
+        if (target >= LIMIT) {
+          if (rampTimerRef.current) { clearInterval(rampTimerRef.current); rampTimerRef.current = null; }
+        }
+      }, 100);
+    }
     try {
-      const ramp = () => { setProgress((v) => (v < 0.6 ? v + 0.02 : v)); pHandle = requestAnimationFrame(ramp); };
-      pHandle = requestAnimationFrame(ramp);
       const progressive = !!opts?.progressive;
       const reqBody: any = { text: ttxt, voice: v, speed: sp, format: 'bundle', container: cont };
+      if (opts?.preview) { reqBody.preview = true; reqBody.previewSec = PREVIEW_SECONDS; }
       if (progressive) { reqBody.startChunk = 0; reqBody.maxChunks = PROG_INITIAL; reqBody.includeMarks = false; reqBody.includeDurations = false; }
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reqBody)
       });
+      // Stop ramp as soon as we have a response and advance progress
+      if (rampTimerRef.current) { clearInterval(rampTimerRef.current); rampTimerRef.current = null; }
+      setProgress((v) => (v < 0.75 ? 0.75 : v));
+      // Allow the 75% update to paint before heavy JSON parsing
+      await nextFrame();
       if (!res.ok) {
         let msg = `TTS request failed (HTTP ${res.status})`;
         try {
@@ -279,6 +323,9 @@ export default function Home() {
         throw new Error(msg);
       }
       const data = await res.json();
+      // Parsing complete; reflect into progress and let it paint
+      setProgress((v) => (v < 0.85 ? 0.85 : v));
+      await nextFrame();
       const segs = (data.segments as { idx: number; audioBase64: string; durationMs: number; startWordIndex: number; mime?: string }[]) || [];
       const chunkEnd: number = Number((data as any).chunkEnd ?? segs.length);
       const totalChunksResp: number = Number((data as any).totalChunks ?? (segs.length ? 1 : 0));
@@ -286,7 +333,7 @@ export default function Home() {
       const urls = segs.map((s) => ({ url: `data:${s.mime || mimeDefault};base64,${s.audioBase64}`, durationMs: s.durationMs, startWordIndex: s.startWordIndex ?? 0 }));
       const totalWords = Number((data as any).totalWords ?? 0) || 0;
       totalWordsRef.current = totalWords;
-      if (pHandle) { cancelAnimationFrame(pHandle); pHandle = null; }
+      if (rampTimerRef.current) { clearInterval(rampTimerRef.current); rampTimerRef.current = null; }
       setSegments(urls);
       segmentsRef.current = urls;
       const bundleTps = (data.timepoints as { wordIndex: number; tMs: number }[]) || [];
@@ -315,11 +362,17 @@ export default function Home() {
       setSegmentOffsets(offs);
       setTimepoints(bundleTps);
       timepointsRef.current = bundleTps;
+      // Initial mapping ready; push progress forward before metadata probing and allow paint
+      setProgress((v) => (v < 0.9 ? 0.9 : v));
+      await nextFrame();
 
       // Build duration-based offsets and word counts per segment for robust sync
       // Prefer conservative durations: use max(measured, server) to avoid running ahead
       const measured = await probeDurations(urls);
       measuredDurMsRef.current = measured.map((m, i) => Math.max(m || 0, urls[i].durationMs || 0));
+      // Metadata probed; almost done
+      setProgress((v) => (v < 0.93 ? 0.93 : v));
+      await nextFrame();
       const durOffsets: number[] = [];
       let accDur = 0;
       for (let i = 0; i < urls.length; i++) {
@@ -336,11 +389,11 @@ export default function Home() {
       }
       wordsPerSegRef.current = wordsPer;
 
-      setProgress(0.95);
+      setProgress((v) => (v < 0.95 ? 0.95 : v));
       setStale(false);
 
       // Progressive background fetch of remaining chunks
-      if ((opts?.progressive) && chunkEnd < (totalChunksResp || 0)) {
+      if ((opts?.progressive) && !opts?.preview && chunkEnd < (totalChunksResp || 0)) {
         const myToken = ++progTokenRef.current;
         (async () => {
           let next = chunkEnd;
@@ -364,6 +417,7 @@ export default function Home() {
       if (typeof window !== 'undefined') alert(message);
       setLoading(false);
       setProgress(0);
+      if (rampTimerRef.current) { clearInterval(rampTimerRef.current); rampTimerRef.current = null; }
       throw err;
     }
   }, [text, voice, speed]);
@@ -397,7 +451,7 @@ export default function Home() {
 
   const startPlayback = useCallback(async () => {
     setMode("read");
-    await prepareRequest();
+    await prepareRequest({ progressive: true });
   }, [prepareRequest]);
 
   const seekToWord = useCallback((wi: number) => {
@@ -464,7 +518,7 @@ export default function Home() {
       if (!fallbackTriedRef.current && containerRef.current === 'ogg') {
         fallbackTriedRef.current = true;
         const wi = activeRef.current >= 0 ? activeRef.current : 0;
-        prepareRequest({ container: 'mp3' })
+        prepareRequest({ container: 'mp3', progressive: true })
           .then(() => {
             if (wi >= 0) {
               seekToWord(wi);
@@ -500,7 +554,7 @@ export default function Home() {
       const count = Math.max(1, wordsPerSegRef.current[segIdx] || 1);
       const startWi = seg.startWordIndex;
       const p = Math.max(0, Math.min(0.999, (audio.currentTime * 1000) / durMs));
-      let wi = startWi + Math.min(count - 1, Math.floor(p * count));
+      const wi = startWi + Math.min(count - 1, Math.floor(p * count));
       if (wi !== activeRef.current) { dbg('index ->', wi, 'at', Math.round(p * durMs)); activeRef.current = wi; setActiveIndex(wi); }
       rafId = requestAnimationFrame(tick);
     };
@@ -547,6 +601,20 @@ export default function Home() {
       return;
     }
 
+    // Non-entitled: start preview flow
+    if (!entitledRef.current) {
+      // Prepare preview without background fetch
+      await prepareRequest({ progressive: true, preview: true });
+      // Open pay modal but do not block preview
+      setShowPay(true);
+      // Start timer to stop preview
+      if (previewTimerRef.current) { clearTimeout(previewTimerRef.current); previewTimerRef.current = null; }
+      previewTimerRef.current = window.setTimeout(() => {
+        if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+        setShowPay(true);
+      }, PREVIEW_SECONDS * 1000);
+    }
+
     // If we already have audio, not stale, not completed, and no pending seek — just resume without seeking
     if (segmentsRef.current.length > 0 && !stale && !completedRef.current && pendingSeekWiRef.current == null) {
       const p = audio.play();
@@ -584,7 +652,7 @@ export default function Home() {
       audio.addEventListener('canplay', () => { audio.play().catch(() => {}); }, { once: true });
     });
     setIsPlaying(true);
-  }, [isPlaying, startPlayback, stale, seekToWord]);
+  }, [isPlaying, startPlayback, stale, seekToWord, prepareRequest, PREVIEW_SECONDS]);
 
   const seekBy = useCallback((delta: number) => {
     if (!audioRef.current) return;
@@ -595,7 +663,7 @@ export default function Home() {
     const nowGlobal = (starts[segIdx] || 0) + audio.currentTime * 1000;
     const lastDur = measuredDurMsRef.current[segs.length - 1] || (segs[segs.length - 1]?.durationMs || 0);
     const totalDur = (starts[segs.length - 1] || 0) + lastDur;
-    let t = Math.max(0, Math.min(totalDur, nowGlobal + delta));
+    const t = Math.max(0, Math.min(totalDur, nowGlobal + delta));
     // Find target segment by duration offsets
     let target = 0, lo = 0, hi = starts.length - 1;
     while (lo <= hi) { const mid = (lo + hi) >> 1; if (starts[mid] <= t) { target = mid; lo = mid + 1; } else { hi = mid - 1; } }
@@ -630,7 +698,7 @@ export default function Home() {
     const targetWi = activeRef.current >= 0 ? activeRef.current : 0;
     pendingSeekWiRef.current = targetWi;
     try {
-      await prepareRequest({ voice: v });
+      await prepareRequest({ voice: v, progressive: true });
       // Seek to the previous word after new audio/timepoints are set
       setTimeout(() => {
         const wi = pendingSeekWiRef.current;
@@ -663,7 +731,7 @@ export default function Home() {
     const targetWi = activeRef.current >= 0 ? activeRef.current : 0;
     pendingSeekWiRef.current = targetWi;
     try {
-      await prepareRequest({ speed: s });
+      await prepareRequest({ speed: s, progressive: true });
       setTimeout(() => {
         const wi = pendingSeekWiRef.current;
         pendingSeekWiRef.current = null;
@@ -899,6 +967,43 @@ export default function Home() {
       </main>
       {/* Hidden audio element to ensure autoplay policies and reliable events */}
       <audio ref={audioRef} className="hidden" preload="auto" playsInline />
+
+      {/* Pay modal (temporary placeholder until Whop embed is wired) */}
+      {showPay && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setShowPay(false)}>
+          <div style={{ background:'var(--bg)', color:'var(--fg)', border:'1px solid var(--border)', borderRadius:8, width:420, maxWidth:'90%', padding:16 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize:18, fontWeight:600, marginBottom:8 }}>Unlock full narration</h3>
+            <p style={{ fontSize:14, opacity:0.85, marginBottom:12 }}>You listened to a {PREVIEW_SECONDS}s preview. Continue listening by completing checkout.</p>
+            <div className="flex" style={{ display:'flex', gap:8, marginBottom:12 }}>
+              <input id="link-email" className="btn" style={{ flex:1 }} placeholder="you@example.com" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
+              <button className="btn" onClick={async () => {
+                const em = linkEmail.trim();
+                if (!em) { alert('Enter your email to continue'); return; }
+                try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
+                const checkout = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL || '#';
+                const ret = `${window.location.origin}/checkout/return?email=${encodeURIComponent(em)}`;
+                // Append return and email as query params for dashboards that allow it (harmless if ignored)
+                const url = checkout + (checkout.includes('?') ? '&' : '?') + `email=${encodeURIComponent(em)}&redirect=${encodeURIComponent(ret)}`;
+                window.location.href = url;
+              }}>Continue to Checkout</button>
+              <button className="btn" onClick={() => setShowPay(false)}>Close</button>
+            </div>
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:12, marginTop:12 }}>
+              <label className="text-sm" htmlFor="already">Purchased already?</label>
+              <div className="flex" style={{ display:'flex', gap:8, marginTop:8 }}>
+                <button className="btn" onClick={async () => {
+                  const em = linkEmail.trim();
+                  if (!em) return;
+                  try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
+                  const r = await fetch(`/api/entitlements?email=${encodeURIComponent(em)}`);
+                  const j = await r.json();
+                  if (j?.entitled) { setEntitled(true); setEmail(em); setShowPay(false); }
+                }}>Link this email</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
