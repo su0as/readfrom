@@ -4,7 +4,6 @@
 // Disable prerendering to avoid static generation errors during build.
 // This page is fully client-driven and fetches/plays audio at runtime.
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VOICES } from "@/components/voices";
