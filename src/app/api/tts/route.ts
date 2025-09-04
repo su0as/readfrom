@@ -350,7 +350,7 @@ export async function POST(req: NextRequest) {
             audioConfig: { audioEncoding: "MP3", speakingRate: speed },
             enableTimePointing: ["WORD"],
           } as any);
-        } catch (e) {
+        } catch (_e) {
           // Fallback to Neural2 voice for WORD marks if target voice does not support it
           usedVoice = fallbackVoiceForLanguage(lang);
           [resp] = await client.synthesizeSpeech({

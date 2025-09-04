@@ -36,9 +36,9 @@ export default function CheckoutReturnPage() {
           setStatus("not_found");
           setMessage("We couldn't find an active purchase for this email. Try another email or contact support.");
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         setStatus("error");
-        setMessage(e?.message || "Verification failed.");
+        setMessage(e instanceof Error ? e.message : "Verification failed.");
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,9 +77,9 @@ export default function CheckoutReturnPage() {
                   setStatus("not_found");
                   setMessage("We couldn't find an active purchase for this email. Try another email.");
                 }
-              } catch (e: any) {
+              } catch (e: unknown) {
                 setStatus("error");
-                setMessage(e?.message || "Verification failed.");
+                setMessage(e instanceof Error ? e.message : "Verification failed.");
               }
             }}
           >Link</button>
