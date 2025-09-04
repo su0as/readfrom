@@ -99,11 +99,11 @@ export default function Home() {
   const [email, setEmail] = useState<string>("");
   const [showPay, setShowPay] = useState<boolean>(false);
   const [linkEmail, setLinkEmail] = useState<string>("");
-  const [plan, setPlan] = useState<"monthly" | "yearly" | "single">(() => (WHOP_MONTHLY && WHOP_YEARLY ? "monthly" : "single"));
-  const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
   const WHOP_MONTHLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY as string | undefined;
   const WHOP_YEARLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY as string | undefined;
   const WHOP_DEFAULT = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL as string | undefined;
+  const [plan, setPlan] = useState<"monthly" | "yearly" | "single">(() => (WHOP_MONTHLY && WHOP_YEARLY ? "monthly" : "single"));
+  const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
   const previewTimerRef = useRef<number | null>(null);
 
   // Progress ramp timer for determinate bar while awaiting server
