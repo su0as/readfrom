@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Spectral } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 const spectral = Spectral({
   variable: "--font-spectral",
@@ -20,7 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="theme-white" suppressHydrationWarning>
-      <body className={`${spectral.variable} antialiased`} suppressHydrationWarning>{children}</body>
+      <body className={`${spectral.variable} antialiased`} suppressHydrationWarning>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

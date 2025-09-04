@@ -95,7 +95,11 @@ export default function Home() {
   const [email, setEmail] = useState<string>("");
   const [showPay, setShowPay] = useState<boolean>(false);
   const [linkEmail, setLinkEmail] = useState<string>("");
+  const [plan, setPlan] = useState<"monthly" | "yearly" | "single">(() => (WHOP_MONTHLY && WHOP_YEARLY ? "monthly" : "single"));
   const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
+  const WHOP_MONTHLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY as string | undefined;
+  const WHOP_YEARLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY as string | undefined;
+  const WHOP_DEFAULT = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL as string | undefined;
   const previewTimerRef = useRef<number | null>(null);
 
   // Progress ramp timer for determinate bar while awaiting server
@@ -974,15 +978,21 @@ export default function Home() {
           <div style={{ background:'var(--bg)', color:'var(--fg)', border:'1px solid var(--border)', borderRadius:8, width:420, maxWidth:'90%', padding:16 }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ fontSize:18, fontWeight:600, marginBottom:8 }}>Unlock full narration</h3>
             <p style={{ fontSize:14, opacity:0.85, marginBottom:12 }}>You listened to a {PREVIEW_SECONDS}s preview. Continue listening by completing checkout.</p>
-            <div className="flex" style={{ display:'flex', gap:8, marginBottom:12 }}>
-              <input id="link-email" className="btn" style={{ flex:1 }} placeholder="you@example.com" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
+            <div className="flex" style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+              <input id="link-email" className="btn" style={{ flex:1, minWidth:220 }} placeholder="you@example.com" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
+              {WHOP_MONTHLY && WHOP_YEARLY ? (
+                <div className="flex" style={{ display:'flex', gap:8 }}>
+                  <button className="btn" aria-pressed={plan==='monthly'} onClick={() => setPlan('monthly')}>Monthly</button>
+                  <button className="btn" aria-pressed={plan==='yearly'} onClick={() => setPlan('yearly')}>Yearly</button>
+                </div>
+              ) : null}
               <button className="btn" onClick={async () => {
                 const em = linkEmail.trim();
                 if (!em) { alert('Enter your email to continue'); return; }
                 try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
-                const checkout = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL || '#';
                 const ret = `${window.location.origin}/checkout/return?email=${encodeURIComponent(em)}`;
-                // Append return and email as query params for dashboards that allow it (harmless if ignored)
+                let checkout = WHOP_DEFAULT || '#';
+                if (WHOP_MONTHLY && WHOP_YEARLY) checkout = plan === 'yearly' ? WHOP_YEARLY! : WHOP_MONTHLY!;
                 const url = checkout + (checkout.includes('?') ? '&' : '?') + `email=${encodeURIComponent(em)}&redirect=${encodeURIComponent(ret)}`;
                 window.location.href = url;
               }}>Continue to Checkout</button>
