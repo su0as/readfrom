@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Billing, Plan, isCheckoutConfigured } from "@/utils/checkout";
+import { useUsdToLocal } from "@/utils/currency";
 type Props = {
   variant?: "full" | "compact";
   selectedPlan: Plan;
