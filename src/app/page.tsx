@@ -97,14 +97,14 @@ export default function Home() {
   const entitledRef = useRef<boolean>(false);
   useEffect(() => { entitledRef.current = entitled; }, [entitled]);
   const [email, setEmail] = useState<string>("");
-  const [showPay, setShowPay] = useState<boolean>(false);
-  const [linkEmail, setLinkEmail] = useState<string>("");
-  const WHOP_MONTHLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY as string | undefined;
-  const WHOP_YEARLY = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY as string | undefined;
-  const WHOP_DEFAULT = process.env.NEXT_PUBLIC_WHOP_CHECKOUT_URL as string | undefined;
-  const [plan, setPlan] = useState<"monthly" | "yearly" | "single">(() => (WHOP_MONTHLY && WHOP_YEARLY ? "monthly" : "single"));
+  // Pricing modal state
+  const [showPricing, setShowPricing] = useState<boolean>(false);
+  const [modalContext, setModalContext] = useState<'play' | 'preview-expired' | 'sidebar' | 'generic'>("generic");
   const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
   const previewTimerRef = useRef<number | null>(null);
+  // Sidebar pricing local state
+  const [sidePlan, setSidePlan] = useState<'basic' | 'pro'>("pro");
+  const [sideBilling, setSideBilling] = useState<'monthly' | 'yearly'>("yearly");
 
   // Progress ramp timer for determinate bar while awaiting server
   const rampTimerRef = useRef<number | null>(null);
@@ -613,13 +613,15 @@ export default function Home() {
     if (!entitledRef.current) {
       // Prepare preview without background fetch
       await prepareRequest({ progressive: true, preview: true });
-      // Open pay modal but do not block preview
-      setShowPay(true);
+      // Open pricing modal but do not block preview
+      setModalContext('play');
+      setShowPricing(true);
       // Start timer to stop preview
       if (previewTimerRef.current) { clearTimeout(previewTimerRef.current); previewTimerRef.current = null; }
       previewTimerRef.current = window.setTimeout(() => {
         if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
-        setShowPay(true);
+        setModalContext('preview-expired');
+        setShowPricing(true);
       }, PREVIEW_SECONDS * 1000);
     }
 
@@ -942,6 +944,31 @@ export default function Home() {
               </>
             )}
           </div>
+
+          {/* Subscribe card for non-entitled users */}
+          {!entitled && (
+            <div className="mt-2">
+              {/* Inline compact pricing */}
+              {/* Lazy import avoided; small component renders fine */}
+              {/* eslint-disable-next-line @typescript-eslint/no-var-requires */}
+              {(() => {
+                const Pricing = require("@/components/Pricing").default as typeof import("@/components/Pricing").default;
+                const { startCheckout } = require("@/utils/checkout") as typeof import("@/utils/checkout");
+                return (
+                  <Pricing
+                    variant="compact"
+                    selectedPlan={sidePlan}
+                    billing={sideBilling}
+                    onPlanChange={(p: any) => setSidePlan(p)}
+                    onBillingChange={(b: any) => setSideBilling(b)}
+                    onCheckout={(p: any, b: any) => { setModalContext('sidebar'); setShowPricing(true); }}
+                    email={email}
+                    onEmailChange={(e: string) => setEmail(e)}
+                  />
+                );
+              })()}
+            </div>
+          )}
         </div>
       </aside>
 
@@ -976,48 +1003,23 @@ export default function Home() {
       {/* Hidden audio element to ensure autoplay policies and reliable events */}
       <audio ref={audioRef} className="hidden" preload="auto" playsInline />
 
-      {/* Pay modal (temporary placeholder until Whop embed is wired) */}
-      {showPay && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setShowPay(false)}>
-          <div style={{ background:'var(--bg)', color:'var(--fg)', border:'1px solid var(--border)', borderRadius:8, width:420, maxWidth:'90%', padding:16 }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize:18, fontWeight:600, marginBottom:8 }}>Unlock full narration</h3>
-            <p style={{ fontSize:14, opacity:0.85, marginBottom:12 }}>You listened to a {PREVIEW_SECONDS}s preview. Continue listening by completing checkout.</p>
-            <div className="flex" style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
-              <input id="link-email" className="btn" style={{ flex:1, minWidth:220 }} placeholder="you@example.com" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
-              {WHOP_MONTHLY && WHOP_YEARLY ? (
-                <div className="flex" style={{ display:'flex', gap:8 }}>
-                  <button className="btn" aria-pressed={plan==='monthly'} onClick={() => setPlan('monthly')}>Monthly</button>
-                  <button className="btn" aria-pressed={plan==='yearly'} onClick={() => setPlan('yearly')}>Yearly</button>
-                </div>
-              ) : null}
-              <button className="btn" onClick={async () => {
-                const em = linkEmail.trim();
-                if (!em) { alert('Enter your email to continue'); return; }
-                try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
-                const ret = `${window.location.origin}/checkout/return?email=${encodeURIComponent(em)}`;
-                let checkout = WHOP_DEFAULT || '#';
-                if (WHOP_MONTHLY && WHOP_YEARLY) checkout = plan === 'yearly' ? WHOP_YEARLY! : WHOP_MONTHLY!;
-                const url = checkout + (checkout.includes('?') ? '&' : '?') + `email=${encodeURIComponent(em)}&redirect=${encodeURIComponent(ret)}`;
-                window.location.href = url;
-              }}>Continue to Checkout</button>
-              <button className="btn" onClick={() => setShowPay(false)}>Close</button>
-            </div>
-            <div style={{ borderTop:'1px solid var(--border)', paddingTop:12, marginTop:12 }}>
-              <label className="text-sm" htmlFor="already">Purchased already?</label>
-              <div className="flex" style={{ display:'flex', gap:8, marginTop:8 }}>
-                <button className="btn" onClick={async () => {
-                  const em = linkEmail.trim();
-                  if (!em) return;
-                  try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
-                  const r = await fetch(`/api/entitlements?email=${encodeURIComponent(em)}`);
-                  const j = await r.json();
-                  if (j?.entitled) { setEntitled(true); setEmail(em); setShowPay(false); }
-                }}>Link this email</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Pricing modal */}
+      {(() => {
+        const PricingModal = require("@/components/PricingModal").default as typeof import("@/components/PricingModal").default;
+        const { startCheckout } = require("@/utils/checkout") as typeof import("@/utils/checkout");
+        return (
+          <PricingModal
+            open={showPricing}
+            initialPlan={"pro"}
+            initialBilling={"yearly"}
+            email={email}
+            onEmailChange={(e: string) => setEmail(e)}
+            onClose={() => setShowPricing(false)}
+            onCheckout={(p, b, em) => startCheckout(p, b, em || email)}
+            context={modalContext}
+          />
+        );
+      })()}
     </div>
   );
 }
