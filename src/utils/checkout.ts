@@ -6,7 +6,7 @@ export type Billing = "monthly" | "yearly";
 
 function env(name: string): string | undefined {
   // process.env.* is inlined by Next.js for NEXT_PUBLIC_ variables
-  return (process.env as any)[name] as string | undefined;
+  return (process.env as Record<string, string | undefined>)[name];
 }
 
 function byPlanBilling(plan: Plan, billing: Billing): (name: string) => string | undefined {

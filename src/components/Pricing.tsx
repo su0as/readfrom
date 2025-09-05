@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Billing, Plan, isCheckoutConfigured, startCheckout } from "@/utils/checkout";
-import { useUsdToLocal } from "@/utils/currency";
-
+import { Billing, Plan, isCheckoutConfigured } from "@/utils/checkout";
 type Props = {
   variant?: "full" | "compact";
   selectedPlan: Plan;

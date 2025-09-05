@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VOICES } from "@/components/voices";
+import Pricing from "@/components/Pricing";
+import PricingModal from "@/components/PricingModal";
+import { startCheckout } from "@/utils/checkout";
 
 // Debug toggle: set window.DEBUG_FOCUS = true in console to enable verbose logs
 const DEBUG_FOCUS: boolean = typeof window !== 'undefined' && !!(window as any).DEBUG_FOCUS;
@@ -948,25 +951,16 @@ export default function Home() {
           {/* Subscribe card for non-entitled users */}
           {!entitled && (
             <div className="mt-2">
-              {/* Inline compact pricing */}
-              {/* Lazy import avoided; small component renders fine */}
-              {/* eslint-disable-next-line @typescript-eslint/no-var-requires */}
-              {(() => {
-                const Pricing = require("@/components/Pricing").default as typeof import("@/components/Pricing").default;
-                const { startCheckout } = require("@/utils/checkout") as typeof import("@/utils/checkout");
-                return (
-                  <Pricing
-                    variant="compact"
-                    selectedPlan={sidePlan}
-                    billing={sideBilling}
-                    onPlanChange={(p: any) => setSidePlan(p)}
-                    onBillingChange={(b: any) => setSideBilling(b)}
-                    onCheckout={(p: any, b: any) => { setModalContext('sidebar'); setShowPricing(true); }}
-                    email={email}
-                    onEmailChange={(e: string) => setEmail(e)}
-                  />
-                );
-              })()}
+              <Pricing
+                variant="compact"
+                selectedPlan={sidePlan}
+                billing={sideBilling}
+                onPlanChange={(p: any) => setSidePlan(p)}
+                onBillingChange={(b: any) => setSideBilling(b)}
+                onCheckout={(p: any, b: any) => { setModalContext('sidebar'); setShowPricing(true); }}
+                email={email}
+                onEmailChange={(e: string) => setEmail(e)}
+              />
             </div>
           )}
         </div>
@@ -1004,22 +998,16 @@ export default function Home() {
       <audio ref={audioRef} className="hidden" preload="auto" playsInline />
 
       {/* Pricing modal */}
-      {(() => {
-        const PricingModal = require("@/components/PricingModal").default as typeof import("@/components/PricingModal").default;
-        const { startCheckout } = require("@/utils/checkout") as typeof import("@/utils/checkout");
-        return (
-          <PricingModal
-            open={showPricing}
-            initialPlan={"pro"}
-            initialBilling={"yearly"}
-            email={email}
-            onEmailChange={(e: string) => setEmail(e)}
-            onClose={() => setShowPricing(false)}
-            onCheckout={(p, b, em) => startCheckout(p, b, em || email)}
-            context={modalContext}
-          />
-        );
-      })()}
+      <PricingModal
+        open={showPricing}
+        initialPlan={"pro"}
+        initialBilling={"yearly"}
+        email={email}
+        onEmailChange={(e: string) => setEmail(e)}
+        onClose={() => setShowPricing(false)}
+        onCheckout={(p, b, em) => startCheckout(p as any, b as any, em || email)}
+        context={modalContext}
+      />
     </div>
   );
 }

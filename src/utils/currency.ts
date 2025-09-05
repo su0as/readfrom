@@ -107,7 +107,7 @@ export async function formatUsdAndLocal(amountUsd: number, targetCode?: string):
 // Optional helper hook for components
 import { useEffect, useMemo, useState } from "react";
 export function useUsdToLocal() {
-  const [code, setCode] = useState<string>(() => (typeof window !== "undefined" ? detectCurrencyCode() : "USD"));
+  const [code] = useState<string>(() => (typeof window !== "undefined" ? detectCurrencyCode() : "USD"));
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,8 +119,8 @@ export function useUsdToLocal() {
         const fx = await getUsdRates();
         if (!mounted) return;
         setRates(fx.rates || {});
-      } catch (e: any) {
-        if (!mounted) return; setError(e?.message || "fx failed");
+      } catch (e: unknown) {
+        if (!mounted) return; setError(e instanceof Error ? e.message : "fx failed");
       } finally {
         if (mounted) setLoading(false);
       }
