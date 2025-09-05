@@ -9,7 +9,11 @@
   --muted: #6b7280; /* gray-500 */
   --dim: #c7c7c7; /* for future text in focus mode */
   --accent: #111111;
+  --accentAlpha: color-mix(in oklab, var(--fg) 12%, transparent);
+  --accentFg: #ffffff;
   --border: #e5e7eb;
+  --surface: #ffffff;
+  --borderStrong: #d1d5db;
   --highlight-current-bg: #ffe066; /* yellow highlight */
   --highlight-read-fg: #9ca3af; /* gray-400 */
 }
@@ -20,7 +24,11 @@ html.theme-dark {
   --muted: #9ca3af;
   --dim: #404040;
   --accent: #f5f5f5;
+  --accentAlpha: color-mix(in oklab, var(--fg) 16%, transparent);
+  --accentFg: #111111;
   --border: #262626;
+  --surface: #1a1a1a;
+  --borderStrong: #3a3a3a;
   --highlight-current-bg: #f59e0b; /* amber-500 */
   --highlight-read-fg: #737373;
 }
@@ -31,7 +39,11 @@ html.theme-beige {
   --muted: #6b7280;
   --dim: #b2a692;
   --accent: #1f2937;
+  --accentAlpha: color-mix(in oklab, var(--fg) 12%, transparent);
+  --accentFg: #ffffff;
   --border: #e6e1d5;
+  --surface: #fffdf6;
+  --borderStrong: #d8d1c3;
   --highlight-current-bg: #fae588;
   --highlight-read-fg: #9b968a;
 }
@@ -59,6 +71,16 @@ body {
 .btn:hover { background: color-mix(in oklab, var(--fg) 8%, var(--bg)); }
 .badge { display: inline-block; font-size: 12px; padding: 2px 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--fg); opacity: 0.8; }
 .updated { background: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
+
+/* Pricing cards */
+.card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); }
+.card-popular { box-shadow: 0 0 0 2px var(--accentAlpha); border-color: var(--accent); }
+.price { font-weight: 700; }
+.strike { text-decoration: line-through; color: var(--muted); }
+.badge-sale { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 9999px; background: var(--accentAlpha); color: var(--fg); font-size: 12px; }
+.toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 9999px; overflow: hidden; }
+.toggle > button[aria-pressed="true"] { background: var(--accent); color: var(--accentFg); }
+.logo-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 
 select, input[type="range"] { color: inherit; }
 
