@@ -56,7 +56,7 @@ export default function PricingSidebar({
         {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
 
         <div className="mt-4 space-y-2">
-          <input className="btn w-full" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
+          <input className="btn-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
           <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
         </div>
 

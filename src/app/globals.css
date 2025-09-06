@@ -67,8 +67,11 @@ body {
 .container { max-width: 80ch; margin: 0 auto; }
 
 /* Controls */
-.btn { @apply px-3 py-2 rounded border; border-color: var(--border); }
+.btn { @apply px-3 py-2 rounded border; border-color: var(--border); cursor: pointer; }
 .btn:hover { background: color-mix(in oklab, var(--fg) 8%, var(--bg)); }
+/* Input variant to ensure consistent typing behavior */
+.btn-input { @apply px-3 py-2 rounded border; border-color: var(--border); background: var(--bg); width: 100%; }
+.btn-input:focus { outline: 2px solid color-mix(in oklab, var(--fg) 20%, transparent); outline-offset: 2px; }
  .btn-primary { border-color: transparent; background: linear-gradient(180deg, color-mix(in oklab, var(--fg) 14%, var(--bg)), color-mix(in oklab, var(--fg) 22%, var(--bg))); color: var(--accentFg); }
  .btn-primary:hover { filter: brightness(1.05); }
  /* Theme-specific primary emphasis: white/beige => black button; dark => beige button */

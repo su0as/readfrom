@@ -67,7 +67,7 @@ export default function PricingPageContent({
 
         {plan !== 'free' ? (
           <div className="mt-4 space-y-2">
-            <input className="btn w-full" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
+            <input className="btn-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
             <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
           </div>
         ) : (
