@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VOICES } from "@/components/voices";
 import Pricing from "@/components/Pricing";
 import PricingModal from "@/components/PricingModal";
+import PricingSidebar from "@/components/PricingSidebar";
+import Onboarding from "@/components/Onboarding";
 import { startCheckout } from "@/utils/checkout";
 
 // Debug toggle: set window.DEBUG_FOCUS = true in console to enable verbose logs
@@ -106,7 +108,6 @@ export default function Home() {
   const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
   const previewTimerRef = useRef<number | null>(null);
   // Sidebar pricing local state
-  const [sidePlan, setSidePlan] = useState<'basic' | 'pro'>("pro");
   const [sideBilling, setSideBilling] = useState<'monthly' | 'yearly'>("yearly");
 
   // Progress ramp timer for determinate bar while awaiting server
@@ -871,6 +872,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Onboarding />
       {/* Top loading bar */}
       <div className={classNames("progress", loading && "active")}><div className="bar" style={{ width: `${Math.round(progress*100)}%` }} /></div>
       {/* Sidebar toggle */}
@@ -951,15 +953,12 @@ export default function Home() {
           {/* Subscribe card for non-entitled users */}
           {!entitled && (
             <div className="mt-2">
-              <Pricing
-                variant="compact"
-                selectedPlan={sidePlan}
-                billing={sideBilling}
-                onPlanChange={(p: any) => setSidePlan(p)}
+              <PricingSidebar
+                billing={sideBilling as any}
                 onBillingChange={(b: any) => setSideBilling(b)}
-                onCheckout={(p: any, b: any) => { setModalContext('sidebar'); setShowPricing(true); }}
                 email={email}
                 onEmailChange={(e: string) => setEmail(e)}
+                onCheckout={(p: any, b: any, em: string) => startCheckout(p, b, em)}
               />
             </div>
           )}

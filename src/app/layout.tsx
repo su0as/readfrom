@@ -26,6 +26,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="theme-white" suppressHydrationWarning>
       <body className={`${spectral.variable} antialiased`} suppressHydrationWarning>
+        <header className="app-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+          <a href="/" className="logo" aria-label="readto home" style={{ textDecoration: 'none' }}>
+            <span className="read" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20 }}>read</span>
+            <span className="to" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20, marginLeft:2 }}>to</span>
+          </a>
+        </header>
         {children}
         <Analytics />
         <SpeedInsights />
