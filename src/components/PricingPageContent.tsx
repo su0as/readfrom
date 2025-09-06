@@ -8,7 +8,7 @@ import Link from "next/link";
 const PRICES = {
   free: { monthly: 0, yearly: 0 },
   basic: { monthly: 4.99, yearly: 39.99 },
-  pro: { monthly: 9.99, yearly: 89.99 },
+  pro: { monthly: 9.99, yearly: 79.99 },
 } as const;
 
 function yearlySavingsPct(monthly: number, yearly: number) {
@@ -67,8 +67,8 @@ export default function PricingPageContent({
 
         {plan !== 'free' ? (
           <div className="mt-4 space-y-2">
-            <input className="btn-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
-            <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
+            <input className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} aria-label="Your email" />
+            <button type="button" className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
           </div>
         ) : (
           <div className="mt-4">

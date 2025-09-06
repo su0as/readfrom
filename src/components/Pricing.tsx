@@ -26,7 +26,7 @@ type Props = {
 // Base USD prices
 const PRICES = {
   basic: { monthly: 4.99, yearly: 39.99 },
-  pro: { monthly: 9.99, yearly: 89.99 },
+  pro: { monthly: 9.99, yearly: 79.99 },
 } as const satisfies Record<Plan, Record<Billing, number>>;
 
 function yearlySavingsPct(monthlyUsd: number, yearlyUsd: number) {

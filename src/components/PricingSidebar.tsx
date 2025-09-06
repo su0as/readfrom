@@ -7,7 +7,7 @@ import Link from "next/link";
 
 const PRICES = {
   basic: { monthly: 4.99, yearly: 39.99 },
-  pro: { monthly: 9.99, yearly: 89.99 },
+  pro: { monthly: 9.99, yearly: 79.99 },
 } as const;
 
 function yearlySavingsPct(monthly: number, yearly: number) {
@@ -56,8 +56,8 @@ export default function PricingSidebar({
         {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
 
         <div className="mt-4 space-y-2">
-          <input className="btn-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
-          <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
+          <input className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} aria-label="Your email" />
+          <button type="button" className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
         </div>
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">
