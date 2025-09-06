@@ -15,7 +15,7 @@ export default function PricingPage() {
   };
 
   return (
-    <main className="container p-6 flex flex-col gap-8">
+    <main className="container p-6 flex flex-col gap-8 fancyOverlay">
       <header className="text-center">
         <h1 className="text-3xl md:text-5xl font-semibold">Listen to what you read</h1>
         <p className="opacity-80 mt-2">Turn any text into natural speech with word-level highlighting and exports.</p>
@@ -33,8 +33,8 @@ export default function PricingPage() {
         <div className="card inline-flex flex-col items-center gap-3 p-6">
           <h3 className="text-xl font-semibold">Ready to narrate your text?</h3>
           <div className="flex flex-wrap justify-center gap-2">
-            <input className="btn" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button className="btn btn-primary" onClick={() => onCheckout('pro', billing, email)}>Subscribe</button>
+            <input className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button type="button" className="btn btn-primary" onClick={() => onCheckout('pro', billing, email)}>Subscribe</button>
           </div>
           <div className="text-sm opacity-70">Cancel anytime. No long-term contracts.</div>
         </div>

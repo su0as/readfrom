@@ -42,6 +42,7 @@ export default function PricingSidebar({
     const features = plan === "basic"
       ? ["Word highlighting", "Multiple voices"]
       : ["Everything in Basic", "Export MP3/WAV"];
+    const ref = React.useRef<HTMLInputElement | null>(null);
 
     return (
       <div className={`card ${highlight ? "card-popular" : ""}`}>
@@ -56,8 +57,8 @@ export default function PricingSidebar({
         {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
 
         <div className="mt-4 space-y-2">
-          <input className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} aria-label="Your email" />
-          <button type="button" className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
+          <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={email} onInput={(e) => onEmailChange((e.target as HTMLInputElement).value)} aria-label="Your email" />
+          <button type="button" className="btn btn-primary w-full" onClick={() => { const em = (ref.current?.value || '').trim(); if (!/.+@.+\..+/.test(em)) return; onCheckout(plan, billing, em); }}>Subscribe</button>
         </div>
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">

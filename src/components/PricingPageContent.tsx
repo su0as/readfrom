@@ -20,6 +20,25 @@ const SAVE = {
   pro: yearlySavingsPct(PRICES.pro.monthly, PRICES.pro.yearly),
 };
 
+function CardEmailCTA({ initial, onChange, onCheckout }: { initial: string; onChange?: (v: string) => void; onCheckout: (email: string) => void }) {
+  const ref = React.useRef<HTMLInputElement | null>(null);
+  const [msg, setMsg] = React.useState<string>("");
+  const tryCheckout = () => {
+    const em = (ref.current?.value || "").trim();
+    if (!/.+@.+\..+/.test(em)) { setMsg("Enter a valid email"); return; }
+    setMsg("");
+    onChange?.(em);
+    onCheckout(em);
+  };
+  return (
+    <div className="mt-4 space-y-2">
+      <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={initial} aria-label="Your email" />
+      {msg && <div className="text-sm opacity-80" role="alert">{msg}</div>}
+      <button type="button" className="btn btn-primary w-full" onClick={tryCheckout}>Subscribe</button>
+    </div>
+  );
+}
+
 export default function PricingPageContent({
   billing,
   onBillingChange,
@@ -34,7 +53,6 @@ export default function PricingPageContent({
   onCheckout: (p: Exclude<keyof typeof PRICES, 'free'> extends Plan ? Plan : Plan, b: Billing, email: string) => void;
 }) {
   const { format } = useUsdToLocal();
-  const emailValid = /.@.+\..+/.test((email || "").trim());
 
   const Card = ({ plan, highlight, description }: { plan: 'free' | 'basic' | 'pro'; highlight?: boolean; description: string }) => {
     const usd = PRICES[plan][billing as 'monthly' | 'yearly'] ?? 0;
@@ -66,10 +84,7 @@ export default function PricingPageContent({
         </div>
 
         {plan !== 'free' ? (
-          <div className="mt-4 space-y-2">
-            <input className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} aria-label="Your email" />
-            <button type="button" className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
-          </div>
+          <CardEmailCTA onCheckout={(em) => onCheckout(plan as 'basic' | 'pro', billing, em)} onChange={onEmailChange} initial={email} />
         ) : (
           <div className="mt-4">
             <Link href="/" className="btn w-full">Get Started</Link>
