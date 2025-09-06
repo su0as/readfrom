@@ -13,6 +13,13 @@ export default function Onboarding({
   const onceKey = "rf_onboard_seen_v1";
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
+  // Stable close handler (define before effects that depend on it)
+  const close = React.useCallback(() => {
+    try { localStorage.setItem(onceKey, "1"); } catch {}
+    setOpen(false);
+    onClose?.();
+  }, [onClose]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const seen = localStorage.getItem(onceKey) === "1";
@@ -25,12 +32,6 @@ export default function Onboarding({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
-
-  const close = React.useCallback(() => {
-    try { localStorage.setItem(onceKey, "1"); } catch {}
-    setOpen(false);
-    onClose?.();
-  }, [onClose]);
 
   if (!open) return null;
 

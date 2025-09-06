@@ -184,7 +184,6 @@ export default function Pricing({
       {(["basic", "pro"] as Plan[]).map((p) => (
         <button
           key={p}
-          role="tab"
           aria-pressed={selectedPlan === p}
           className="px-3 py-2 capitalize"
           onClick={() => { onPlanChange(p); analytics?.onPlanSelect?.(p); }}
