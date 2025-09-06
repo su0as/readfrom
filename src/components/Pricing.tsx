@@ -50,9 +50,10 @@ function PlanCard({
   plan,
   billing,
   highlight,
-  email,
+  email = "",
   onEmailChange,
   onCheckout,
+  requireEmail = true,
 }: {
   plan: Plan;
   billing: Billing;
@@ -60,6 +61,7 @@ function PlanCard({
   email?: string;
   onEmailChange?: (v: string) => void;
   onCheckout: (plan: Plan, billing: Billing, email?: string) => void;
+  requireEmail?: boolean;
 }) {
   const { format } = useUsdToLocal();
   const usd = PRICES[plan][billing];
@@ -86,6 +88,7 @@ function PlanCard({
   }, [plan]);
 
   const configured = isCheckoutConfigured();
+  const emailValid = !requireEmail || /.+@.+\..+/.test((email || "").trim());
 
   return (
     <div className={`card ${highlight ? "card-popular" : ""}`}>
@@ -111,19 +114,25 @@ function PlanCard({
       </ul>
 
       <div className="mt-4 flex flex-col gap-2">
-        {!email && onEmailChange && (
+        {onEmailChange && (
           <input
             className="btn"
             type="email"
             placeholder="you@example.com"
+            value={email}
             onChange={(e) => onEmailChange(e.target.value)}
+            aria-label="Your email"
+            required={requireEmail}
           />
+        )}
+        {!emailValid && requireEmail && (
+          <div className="text-sm opacity-80" role="alert">Enter a valid email to continue</div>
         )}
         <button
           className="btn"
-          disabled={!configured}
-          title={configured ? "Subscribe" : "Checkout not configured"}
-          onClick={() => onCheckout(plan, billing, email)}
+          disabled={!configured || !emailValid}
+          title={configured ? (emailValid ? "Subscribe" : "Enter a valid email") : "Checkout not configured"}
+          onClick={() => { if (emailValid) onCheckout(plan, billing, email); }}
           aria-label={`Subscribe to ${plan} ${billing}`}
         >
           Subscribe
@@ -193,7 +202,7 @@ export default function Pricing({
         <h3 className="text-base font-semibold">Unlock full narration</h3>
         {PlanSwitch}
         {Toggle}
-        <PlanCard plan={selectedPlan} billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} />
+        <PlanCard plan={selectedPlan} billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
         <ul className="text-sm opacity-80 list-disc ml-5">
           <li>Unlimited listening</li>
           <li>Higher-quality voices</li>
@@ -214,8 +223,8 @@ export default function Pricing({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <PlanCard plan="basic" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} />
-        <PlanCard plan="pro" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} />
+        <PlanCard plan="basic" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
+        <PlanCard plan="pro" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
       </div>
 
       {showComparison && (
