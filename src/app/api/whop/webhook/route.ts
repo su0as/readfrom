@@ -44,6 +44,8 @@ function isActivateEvent(payload: any): boolean {
   const t = eventType(payload);
   return (
     t === "app_payment_succeeded" ||
+    // Common patterns
+    (t.includes("payment") && (t.includes("succeeded") || t.includes("success") || t.includes("completed"))) ||
     (t.includes("purchase") && (t.includes("completed") || t.includes("succeeded"))) ||
     (t.includes("subscription") && (t.includes("created") || t.includes("activated") || t.includes("updated") || t.includes("active"))) ||
     (t.includes("license") && (t.includes("created") || t.includes("activated")))
@@ -52,7 +54,7 @@ function isActivateEvent(payload: any): boolean {
 
 function isCancelEvent(payload: any): boolean {
   const t = eventType(payload);
-  return t.includes("cancel") || t.includes("expired") || t.includes("past_due") || t.includes("payment_failed");
+  return t.includes("cancel") || t.includes("expired") || t.includes("past_due") || t.includes("payment_failed") || t.includes("refund");
 }
 
 function extractPeriodEndMs(payload: any): number | undefined {
