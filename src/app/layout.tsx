@@ -29,8 +29,8 @@ export default function RootLayout({
       <body className={`${spectral.variable} antialiased`} suppressHydrationWarning>
         <header className="app-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
           <Link href="/" className="logo" aria-label="readto home" style={{ textDecoration: 'none' }}>
-            <span className="read" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20 }}>read</span>
-            <span className="to" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20, marginLeft:2 }}>to</span>
+            <span className="read" style={{ textTransform:'lowercase', fontWeight:400, fontFamily:'var(--font-spectral)', fontSize:20 }}>read</span>
+            <span className="to" style={{ textTransform:'lowercase', fontWeight:400, fontFamily:'var(--font-spectral)', fontSize:20, marginLeft:2 }}>to</span>
           </Link>
         </header>
         {children}

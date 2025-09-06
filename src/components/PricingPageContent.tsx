@@ -58,9 +58,9 @@ export default function PricingPageContent({
         <p className="opacity-80 mt-2 text-sm">{description}</p>
 
         {plan !== 'free' ? (
-          <div className="mt-3 flex gap-2">
-            <input className="btn" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
-            <button className="btn btn-primary" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
+          <div className="mt-3 flex flex-wrap items-stretch gap-2">
+            <input className="btn flex-1 min-w-0 w-full sm:w-auto" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
+            <button className="btn btn-primary whitespace-nowrap" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
           </div>
         ) : (
           <Link href="/" className="btn mt-3">Get Started</Link>
