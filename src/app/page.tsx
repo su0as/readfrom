@@ -108,7 +108,7 @@ export default function Home() {
   const PREVIEW_SECONDS = Math.max(5, Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")));
   const previewTimerRef = useRef<number | null>(null);
   // Sidebar pricing local state
-  const [sideBilling, setSideBilling] = useState<'monthly' | 'yearly'>("yearly");
+  const [sideBilling, setSideBilling] = useState<'monthly' | 'yearly'>("monthly");
 
   // Progress ramp timer for determinate bar while awaiting server
   const rampTimerRef = useRef<number | null>(null);
@@ -1000,7 +1000,7 @@ export default function Home() {
       <PricingModal
         open={showPricing}
         initialPlan={"pro"}
-        initialBilling={"yearly"}
+        initialBilling={"monthly"}
         email={email}
         onEmailChange={(e: string) => setEmail(e)}
         onClose={() => setShowPricing(false)}

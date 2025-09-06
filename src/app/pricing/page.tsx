@@ -7,7 +7,7 @@ import { Billing, Plan, startCheckout } from "@/utils/checkout";
 export const dynamic = "force-dynamic";
 
 export default function PricingPage() {
-  const [billing, setBilling] = useState<Billing>("yearly");
+  const [billing, setBilling] = useState<Billing>("monthly");
   const [email, setEmail] = useState<string>("");
 
   const onCheckout = (p: Plan, b: Billing, em?: string) => {
