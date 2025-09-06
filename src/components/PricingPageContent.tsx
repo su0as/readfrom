@@ -3,6 +3,7 @@
 import React from "react";
 import { Billing, Plan } from "@/utils/checkout";
 import { useUsdToLocal } from "@/utils/currency";
+import Link from "next/link";
 
 const PRICES = {
   free: { monthly: 0, yearly: 0 },
@@ -62,7 +63,7 @@ export default function PricingPageContent({
             <button className="btn btn-primary" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
           </div>
         ) : (
-          <a href="/" className="btn mt-3">Get Started</a>
+          <Link href="/" className="btn mt-3">Get Started</Link>
         )}
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">
@@ -78,9 +79,9 @@ export default function PricingPageContent({
         <h2 className="text-2xl md:text-4xl font-semibold">Plans to maximize your focus</h2>
         <p className="opacity-80 mt-2">Choose monthly or save with yearly billing.</p>
         <div className="mt-4 flex items-center justify-center gap-3">
-          <div className="toggle" role="tablist" aria-label="Billing">
+          <div className="toggle" aria-label="Billing">
             {(["monthly", "yearly"] as Billing[]).map((b) => (
-              <button key={b} role="tab" aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>
+              <button key={b} aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>
                 {b === "yearly" ? <>Yearly <span className="opacity-80">(save {SAVE.pro}%)</span></> : "Monthly"}
               </button>
             ))}

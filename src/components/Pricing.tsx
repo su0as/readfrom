@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Billing, Plan, isCheckoutConfigured } from "@/utils/checkout";
 import { useUsdToLocal } from "@/utils/currency";
 type Props = {
@@ -156,16 +156,15 @@ export default function Pricing({
   onEmailChange,
   analytics,
 }: Props) {
-  useEffect(() => { analytics?.onOpen?.(); }, []);
+  useEffect(() => { analytics?.onOpen?.(); }, [analytics]);
   const savingsBasic = SAVINGS.basic;
   const savingsPro = SAVINGS.pro;
 
   const Toggle = (
-    <div className="toggle" role="tablist" aria-label="Billing toggle">
+    <div className="toggle" aria-label="Billing toggle">
       {(["monthly", "yearly"] as Billing[]).map((b) => (
         <button
           key={b}
-          role="tab"
           aria-pressed={billing === b}
           className="px-3 py-2"
           onClick={() => { onBillingChange(b); analytics?.onBillingSelect?.(b); }}
@@ -181,7 +180,7 @@ export default function Pricing({
   );
 
   const PlanSwitch = (
-    <div className="toggle" role="tablist" aria-label="Plan toggle">
+    <div className="toggle" aria-label="Plan toggle">
       {(["basic", "pro"] as Plan[]).map((p) => (
         <button
           key={p}

@@ -3,6 +3,7 @@
 import React from "react";
 import { Billing, Plan } from "@/utils/checkout";
 import { useUsdToLocal } from "@/utils/currency";
+import Link from "next/link";
 
 const PRICES = {
   basic: { monthly: 4.99, yearly: 39.99 },
@@ -32,8 +33,7 @@ export default function PricingSidebar({
   onCheckout: (p: Plan, b: Billing, email: string) => void;
 }) {
   const { format } = useUsdToLocal();
-  const emailValid = /.@.+\..+/.test((email || "").trim());
-  const saveMsg = billing === "yearly" ? `Save ${SAVE.pro}%` : undefined;
+  const emailValid = /.+@.+\..+/.test((email || "").trim());
 
   const Card = ({ plan, highlight }: { plan: Plan; highlight?: boolean }) => {
     const usd = PRICES[plan][billing];
@@ -68,16 +68,16 @@ export default function PricingSidebar({
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-base font-semibold">Unlock full narration</h3>
-      <div className="toggle" role="tablist" aria-label="Billing">
+      <div className="toggle" aria-label="Billing">
         {(["monthly", "yearly"] as Billing[]).map((b) => (
-          <button key={b} role="tab" aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>
+          <button key={b} aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>
             {b === "yearly" ? <>Yearly <span className="opacity-80">(save {SAVE.pro}%)</span></> : "Monthly"}
           </button>
         ))}
       </div>
       <Card plan="basic" />
       <Card plan="pro" highlight />
-      <a className="text-sm underline opacity-80" href="/pricing">See all plans</a>
+      <Link className="text-sm underline opacity-80" href="/pricing">See all plans</Link>
     </div>
   );
 }

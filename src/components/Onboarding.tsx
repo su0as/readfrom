@@ -24,13 +24,13 @@ export default function Onboarding({
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { close(); } };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, close]);
 
-  function close() {
+  const close = React.useCallback(() => {
     try { localStorage.setItem(onceKey, "1"); } catch {}
     setOpen(false);
     onClose?.();
-  }
+  }, [onClose]);
 
   if (!open) return null;
 

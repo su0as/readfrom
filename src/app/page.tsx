@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VOICES } from "@/components/voices";
-import Pricing from "@/components/Pricing";
+// import Pricing from "@/components/Pricing";
 import PricingModal from "@/components/PricingModal";
 import PricingSidebar from "@/components/PricingSidebar";
 import Onboarding from "@/components/Onboarding";

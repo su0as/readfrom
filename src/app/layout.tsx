@@ -3,6 +3,7 @@ import { Spectral } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Link from "next/link";
 
 const spectral = Spectral({
   variable: "--font-spectral",
@@ -27,10 +28,10 @@ export default function RootLayout({
     <html lang="en" className="theme-white" suppressHydrationWarning>
       <body className={`${spectral.variable} antialiased`} suppressHydrationWarning>
         <header className="app-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-          <a href="/" className="logo" aria-label="readto home" style={{ textDecoration: 'none' }}>
+          <Link href="/" className="logo" aria-label="readto home" style={{ textDecoration: 'none' }}>
             <span className="read" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20 }}>read</span>
             <span className="to" style={{ textTransform:'lowercase', fontWeight:700, fontFamily:'var(--font-spectral)', fontSize:20, marginLeft:2 }}>to</span>
-          </a>
+          </Link>
         </header>
         {children}
         <Analytics />
