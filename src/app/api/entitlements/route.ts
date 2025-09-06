@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
     if (!email) return NextResponse.json({ entitled: false });
     const entitled = await isEntitled(email);
     const ent = await getEntitlement(email);
+    if (process.env.DEBUG_WHOP === "1") {
+      console.log("[ENTL] lookup", email, { entitled, ent });
+    }
     return NextResponse.json({ email, entitled, entitlement: ent || undefined });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Failed" }, { status: 500 });

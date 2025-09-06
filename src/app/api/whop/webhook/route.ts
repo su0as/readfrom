@@ -5,7 +5,7 @@ import { setEntitlement } from "@/utils/entitlements";
 export const runtime = "nodejs";
 
 // NOTE: This is a scaffold. We'll wire real signature verification once you provide WHOP_WEBHOOK_SECRET
-// and confirm header/algorithm. Until then, it accepts JSON and extracts an email from common fields.
+// and confirm header/algorithm. Until then, it accepts JSON (or form-encoded fallback) and extracts an email.
 
 function get(obj: any, path: string[]): any {
   try {
@@ -20,19 +20,24 @@ function extractEmail(payload: any): string | null {
     payload?.customer?.email,
     payload?.user?.email,
     payload?.purchaser?.email,
+    payload?.buyer_email,
+    payload?.customer_email,
+    payload?.emailAddress,
     payload?.email,
     get(payload, ["data", "email"]),
     get(payload, ["data", "customer", "email"]),
     get(payload, ["data", "user", "email"]),
     get(payload, ["data", "purchaser", "email"]),
+    get(payload, ["data", "attributes", "email"]),
     get(payload, ["order", "customer", "email"]),
+    get(payload, ["event", "data", "customer_email"]),
   ];
   const found = candidates.find((v) => typeof v === "string" && v.includes("@"));
   return (found as string) || null;
 }
 
 function eventType(payload: any): string {
-  return (payload?.type || payload?.event || get(payload, ["data", "type"]) || "").toString().toLowerCase();
+  return (payload?.type || payload?.event || get(payload, ["data", "type"]) || get(payload, ["event", "type"]) || "").toString().toLowerCase();
 }
 
 function isActivateEvent(payload: any): boolean {
@@ -74,11 +79,29 @@ function extractPeriodEndMs(payload: any): number | undefined {
 export async function POST(req: NextRequest) {
   try {
     // TODO: verify signature header if WHOP_WEBHOOK_SECRET is set
-    const body = await req.json();
+    let body: any = null;
+    try {
+      body = await req.json();
+    } catch {
+      // Fallback: attempt to parse form-encoded or raw text JSON
+      try {
+        const txt = await req.text();
+        try { body = JSON.parse(txt); } catch {
+          const p = new URLSearchParams(txt);
+          const obj: Record<string, any> = {};
+          p.forEach((v, k) => { obj[k] = v; });
+          body = obj;
+        }
+      } catch {}
+    }
+    if (!body) return NextResponse.json({ ok: false, reason: "no body" }, { status: 400 });
     const email = extractEmail(body);
     if (!email) return NextResponse.json({ ok: false, reason: "no email" }, { status: 400 });
 
     const now = Date.now();
+    if (process.env.DEBUG_WHOP === "1") {
+      console.log("[WHOP] event:", eventType(body), "email:", email, "plan:", body?.plan_id || get(body,["data","plan_id"]) || get(body,["plan","id"]));
+    }
     if (isActivateEvent(body)) {
       await setEntitlement({
         email,
