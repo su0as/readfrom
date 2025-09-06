@@ -45,17 +45,19 @@ export default function PricingSidebar({
 
     return (
       <div className={`card ${highlight ? "card-popular" : ""}`}>
-        <div className="flex items-center justify-between mb-1">
-          <h4 className="font-semibold capitalize">{plan}</h4>
-          {highlight && <span className="badge">Recommended</span>}
+        <div className="mb-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold capitalize">{plan}</h4>
+            {highlight && <span className="badge">Recommended</span>}
+          </div>
         </div>
-        <div className="mb-1 text-2xl price">{primary}</div>
+        <div className="text-2xl price">{primary}</div>
         {anchor && <div className="text-sm opacity-70">≈ {anchor} USD</div>}
         {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
 
-        <div className="mt-3 flex flex-wrap items-stretch gap-2">
-          <input className="btn flex-1 min-w-0 w-full" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
-          <button className="btn btn-primary whitespace-nowrap" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
+        <div className="mt-4 space-y-2">
+          <input className="btn w-full" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
+          <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan, billing, email)}>Subscribe</button>
         </div>
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">

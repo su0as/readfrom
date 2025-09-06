@@ -69,8 +69,12 @@ body {
 /* Controls */
 .btn { @apply px-3 py-2 rounded border; border-color: var(--border); }
 .btn:hover { background: color-mix(in oklab, var(--fg) 8%, var(--bg)); }
-.btn-primary { border-color: transparent; background: linear-gradient(180deg, color-mix(in oklab, var(--fg) 14%, var(--bg)), color-mix(in oklab, var(--fg) 22%, var(--bg))); color: var(--accentFg); }
-.btn-primary:hover { filter: brightness(1.05); }
+ .btn-primary { border-color: transparent; background: linear-gradient(180deg, color-mix(in oklab, var(--fg) 14%, var(--bg)), color-mix(in oklab, var(--fg) 22%, var(--bg))); color: var(--accentFg); }
+ .btn-primary:hover { filter: brightness(1.05); }
+ /* Theme-specific primary emphasis: white/beige => black button; dark => beige button */
+ html:not(.theme-dark):not(.theme-beige) .btn-primary { background: #111111; color: #ffffff; }
+ html.theme-beige .btn-primary { background: #111111; color: #ffffff; }
+ html.theme-dark .btn-primary { background: #f5f1e6; color: #1f2937; }
 .badge { display: inline-block; font-size: 12px; padding: 2px 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--fg); opacity: 0.8; }
 .updated { background: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
 

@@ -48,27 +48,33 @@ export default function PricingPageContent({
 
     return (
       <div className={`card ${highlight ? 'card-popular' : ''}`}>
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold capitalize">{plan}</h3>
-          {highlight && <span className="badge">Most popular</span>}
+        <div className="mb-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold capitalize">{plan}</h3>
+            {highlight && <span className="badge">Most popular</span>}
+          </div>
+          <p className="opacity-80 mt-1 text-sm">{description}</p>
         </div>
-        <div className="mb-1 text-3xl price">{primary}</div>
-        {anchor && usd > 0 && <div className="text-sm opacity-70">≈ {anchor} USD</div>}
-        {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
-        <p className="opacity-80 mt-2 text-sm">{description}</p>
+
+        <div className="space-y-2">
+          <div className="text-3xl price">{primary}</div>
+          {anchor && usd > 0 && <div className="text-sm opacity-70">≈ {anchor} USD</div>}
+          {savings > 0 && <div className="badge-sale">Save {savings}%</div>}
+          <ul className="text-sm opacity-90 mt-2 list-disc ml-5">
+            {features.map((f) => (<li key={f}>{f}</li>))}
+          </ul>
+        </div>
 
         {plan !== 'free' ? (
-          <div className="mt-3 flex flex-wrap items-stretch gap-2">
-            <input className="btn flex-1 min-w-0 w-full sm:w-auto" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
-            <button className="btn btn-primary whitespace-nowrap" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
+          <div className="mt-4 space-y-2">
+            <input className="btn w-full" type="email" placeholder="you@example.com" value={email} onChange={(e) => onEmailChange(e.target.value)} />
+            <button className="btn btn-primary w-full" disabled={!emailValid} onClick={() => emailValid && onCheckout(plan as 'basic' | 'pro', billing, email)}>Subscribe</button>
           </div>
         ) : (
-          <Link href="/" className="btn mt-3">Get Started</Link>
+          <div className="mt-4">
+            <Link href="/" className="btn w-full">Get Started</Link>
+          </div>
         )}
-
-        <ul className="text-sm opacity-90 mt-3 list-disc ml-5">
-          {features.map((f) => (<li key={f}>{f}</li>))}
-        </ul>
       </div>
     );
   };
