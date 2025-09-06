@@ -4,9 +4,26 @@
 export type Plan = "basic" | "pro";
 export type Billing = "monthly" | "yearly";
 
+// Optional hardcoded fallbacks (used if env vars are missing)
+// These can be overwritten by setting NEXT_PUBLIC_WHOP_CHECKOUT_URL_* env vars.
+const FALLBACK_LINKS: Partial<Record<"BASIC_MONTHLY" | "BASIC_YEARLY" | "PRO_MONTHLY" | "PRO_YEARLY", string>> = {
+  BASIC_MONTHLY: "https://whop.com/checkout/plan_WuQ9oNNUPtoqW?d2c=true",
+  BASIC_YEARLY: "https://whop.com/checkout/plan_UREUrsMIXAO1N?d2c=true",
+  PRO_MONTHLY: "https://whop.com/checkout/plan_o9jbTY2jmGRo8?d2c=true",
+  PRO_YEARLY: "https://whop.com/checkout/plan_DWncFUzXGw4Cc?d2c=true",
+};
+
 function env(name: string): string | undefined {
   // process.env.* is inlined by Next.js for NEXT_PUBLIC_ variables
-  return (process.env as Record<string, string | undefined>)[name];
+  const val = (process.env as Record<string, string | undefined>)[name];
+  if (val) return val;
+  // If a direct env is missing, return a fallback when the name matches our pattern
+  const m = name.match(/^NEXT_PUBLIC_WHOP_CHECKOUT_URL_(BASIC|PRO)_(MONTHLY|YEARLY)$/);
+  if (m) {
+    const key = `${m[1]}_${m[2]}` as keyof typeof FALLBACK_LINKS;
+    return FALLBACK_LINKS[key];
+  }
+  return undefined;
 }
 
 function byPlanBilling(plan: Plan, billing: Billing): (name: string) => string | undefined {
@@ -16,7 +33,7 @@ function byPlanBilling(plan: Plan, billing: Billing): (name: string) => string |
 
 export function getCheckoutBaseUrl(plan: Plan, billing: Billing): string | null {
   // Tier-specific url
-  const tier = byPlanBilling(plan, billing)("WHOP_CHECKOUT_URL");
+  const tier = byPlanBilling(plan, billing)("WHOP_CHECKOUT_URL") || env(`NEXT_PUBLIC_WHOP_CHECKOUT_URL_${plan.toUpperCase()}_${billing.toUpperCase()}`);
   if (tier) return tier;
   // Generic monthly/yearly fallbacks
   const genericByBilling = env(`NEXT_PUBLIC_WHOP_CHECKOUT_URL_${billing.toUpperCase()}`);
@@ -67,7 +84,8 @@ export function isCheckoutConfigured(): boolean {
     env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY") ||
     env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY") ||
     env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY")
+    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY") ||
+    FALLBACK_LINKS.BASIC_MONTHLY || FALLBACK_LINKS.BASIC_YEARLY || FALLBACK_LINKS.PRO_MONTHLY || FALLBACK_LINKS.PRO_YEARLY
   );
 }
 
