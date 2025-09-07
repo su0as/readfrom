@@ -67,8 +67,7 @@ function eventType(payload: any): string {
   return (payload?.type || payload?.event || get(payload, ["data", "type"]) || get(payload, ["event", "type"]) || "").toString().toLowerCase();
 }
 
-function isActivateEvent(payload: any): boolean {
-  const t = eventType(payload);
+function isActivateType(t: string): boolean {
   return (
     t === "app_payment_succeeded" ||
     // Common patterns
@@ -79,8 +78,7 @@ function isActivateEvent(payload: any): boolean {
   );
 }
 
-function isCancelEvent(payload: any): boolean {
-  const t = eventType(payload);
+function isCancelType(t: string): boolean {
   return t.includes("cancel") || t.includes("expired") || t.includes("past_due") || t.includes("payment_failed") || t.includes("refund");
 }
 
@@ -125,14 +123,23 @@ export async function POST(req: NextRequest) {
     }
     if (!body) return NextResponse.json({ ok: false, reason: "no body" }, { status: 400 });
     const email = extractEmail(body);
+    // Header fallbacks for event type
+    const headerType = (
+      req.headers.get("x-whop-event") ||
+      req.headers.get("x-whop-type") ||
+      req.headers.get("x-event-type") ||
+      req.headers.get("event-type") ||
+      ""
+    ).toLowerCase();
+    const t = (eventType(body) || headerType).toLowerCase();
     if (!email) return NextResponse.json({ ok: false, reason: "no email" }, { status: 400 });
 
     const now = Date.now();
     if (process.env.DEBUG_WHOP === "1") {
       try { console.log("[WHOP] raw:", JSON.stringify(body).slice(0, 2000)); } catch {}
-      console.log("[WHOP] event:", eventType(body), "email:", email, "plan:", body?.plan_id || get(body,["data","plan_id"]) || get(body,["plan","id"]));
+      console.log("[WHOP] event:", t, "email:", email, "plan:", body?.plan_id || get(body,["data","plan_id"]) || get(body,["plan","id"]));
     }
-    if (isActivateEvent(body)) {
+    if (isActivateType(t)) {
       await setEntitlement({
         email,
         status: "active",
@@ -145,7 +152,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    if (isCancelEvent(body)) {
+    if (isCancelType(t)) {
       await setEntitlement({
         email,
         status: "canceled",
@@ -158,7 +165,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Ignore unknown events
-    return NextResponse.json({ ok: true, ignored: true, event: eventType(body) });
+    return NextResponse.json({ ok: true, ignored: true, event: t });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "webhook failed" }, { status: 500 });
   }
