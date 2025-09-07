@@ -18,7 +18,9 @@ export default function CheckoutReturnPage() {
       setEmail(em);
       try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
     }
-    const toCheck = em || (typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )rf_email=([^;]+)/)?.[1] && decodeURIComponent(document.cookie.match(/(?:^|; )rf_email=([^;]+)/)![1])) : "");
+    const toCheck: string = (em || (typeof document !== 'undefined'
+      ? decodeURIComponent(document.cookie.match(/(?:^|; )rf_email=([^;]+)/)?.[1] || '')
+      : '')).trim();
     if (!toCheck) {
       setStatus("not_found");
       setMessage("Enter your email to link your purchase.");
