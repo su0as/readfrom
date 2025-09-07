@@ -16,6 +16,7 @@ function get(obj: any, path: string[]): any {
 }
 
 function extractEmail(payload: any): string | null {
+  // 1) Fast-path candidates at common locations
   const candidates = [
     payload?.customer?.email,
     payload?.user?.email,
@@ -31,9 +32,35 @@ function extractEmail(payload: any): string | null {
     get(payload, ["data", "attributes", "email"]),
     get(payload, ["order", "customer", "email"]),
     get(payload, ["event", "data", "customer_email"]),
+    get(payload, ["resource", "attributes", "email"]),
+    get(payload, ["resource", "email"]),
+    get(payload, ["attributes", "email"]),
   ];
-  const found = candidates.find((v) => typeof v === "string" && v.includes("@"));
-  return (found as string) || null;
+  let found = candidates.find((v) => typeof v === "string" && v.includes("@"));
+  if (found) return found as string;
+  // 2) Deep scan: prefer keys that include 'email', else any string containing '@'
+  const seen = new Set<any>();
+  const prefer: string[] = [];
+  const fallback: string[] = [];
+  const stack: any[] = [payload];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
+    seen.add(cur);
+    for (const [k, v] of Object.entries(cur)) {
+      if (typeof v === "string") {
+        if (v.includes("@")) {
+          if (k.toLowerCase().includes("email")) prefer.push(v);
+          else fallback.push(v);
+        }
+      } else if (v && typeof v === "object") {
+        stack.push(v);
+      }
+    }
+  }
+  if (prefer.length) return prefer[0];
+  if (fallback.length) return fallback[0];
+  return null;
 }
 
 function eventType(payload: any): string {
@@ -102,6 +129,7 @@ export async function POST(req: NextRequest) {
 
     const now = Date.now();
     if (process.env.DEBUG_WHOP === "1") {
+      try { console.log("[WHOP] raw:", JSON.stringify(body).slice(0, 2000)); } catch {}
       console.log("[WHOP] event:", eventType(body), "email:", email, "plan:", body?.plan_id || get(body,["data","plan_id"]) || get(body,["plan","id"]));
     }
     if (isActivateEvent(body)) {
