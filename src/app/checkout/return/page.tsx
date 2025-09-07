@@ -24,23 +24,40 @@ export default function CheckoutReturnPage() {
       setMessage("Enter your email to link your purchase.");
       return;
     }
-    (async () => {
+    let cancelled = false;
+    async function once() {
       try {
         const r = await fetch(`/api/entitlements?email=${encodeURIComponent(toCheck)}`);
         const j = await r.json();
+        if (cancelled) return;
         if (j?.entitled) {
           setStatus("entitled");
           setMessage("All set — your access is unlocked.");
           setTimeout(redirectHome, 1000);
-        } else {
-          setStatus("not_found");
-          setMessage("We couldn't find an active purchase for this email. Try another email or contact support.");
+          return true;
         }
+        return false;
       } catch (e: unknown) {
-        setStatus("error");
-        setMessage(e instanceof Error ? e.message : "Verification failed.");
+        if (!cancelled) { setStatus("error"); setMessage(e instanceof Error ? e.message : "Verification failed."); }
+        return false;
+      }
+    }
+    (async () => {
+      // Try up to 60s to allow webhook propagation
+      setStatus("checking");
+      setMessage("Verifying your purchase…");
+      const start = Date.now();
+      while (!cancelled && Date.now() - start < 60000) {
+        const ok = await once();
+        if (ok) return;
+        await new Promise((res) => setTimeout(res, 3000));
+      }
+      if (!cancelled) {
+        setStatus("not_found");
+        setMessage("We couldn't find an active purchase for this email. Try another email or contact support.");
       }
     })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search?.toString()]);
 
