@@ -33,7 +33,6 @@ export default function PricingSidebar({
   onCheckout: (p: Plan, b: Billing, email: string) => void;
 }) {
   const { format } = useUsdToLocal();
-  const emailValid = /.+@.+\..+/.test((email || "").trim());
 
   const Card = ({ plan, highlight }: { plan: Plan; highlight?: boolean }) => {
     const usd = PRICES[plan][billing];

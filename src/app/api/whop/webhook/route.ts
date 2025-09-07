@@ -36,7 +36,7 @@ function extractEmail(payload: any): string | null {
     get(payload, ["resource", "email"]),
     get(payload, ["attributes", "email"]),
   ];
-  let found = candidates.find((v) => typeof v === "string" && v.includes("@"));
+  const found = candidates.find((v) => typeof v === "string" && v.includes("@"));
   if (found) return found as string;
   // 2) Deep scan: prefer keys that include 'email', else any string containing '@'
   const seen = new Set<any>();
