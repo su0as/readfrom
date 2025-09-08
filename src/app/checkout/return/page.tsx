@@ -45,7 +45,11 @@ export default function CheckoutReturnPage() {
       }
     }
     (async () => {
-      // Try up to 60s to allow webhook propagation
+      // Try server-side verification first (active check via Whop API)
+      try {
+        await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: toCheck }) });
+      } catch {}
+      // Then poll up to 60s to allow webhook/verify propagation
       setStatus("checking");
       setMessage("Verifying your purchase…");
       const start = Date.now();
