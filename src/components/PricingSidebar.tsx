@@ -25,12 +25,14 @@ export default function PricingSidebar({
   email,
   onEmailChange,
   onCheckout,
+  entitled = false,
 }: {
   billing: Billing;
   onBillingChange: (b: Billing) => void;
   email: string;
   onEmailChange: (v: string) => void;
   onCheckout: (p: Plan, b: Billing, email: string) => void;
+  entitled?: boolean;
 }) {
   const { format } = useUsdToLocal();
 
@@ -70,6 +72,9 @@ export default function PricingSidebar({
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-base font-semibold">Unlock full narration</h3>
+      {entitled && (
+        <div className="badge" title="Your plan is active">Active plan</div>
+      )}
       <div className="toggle" aria-label="Billing">
         {(["monthly", "yearly"] as Billing[]).map((b) => (
           <button key={b} aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>

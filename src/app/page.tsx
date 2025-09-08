@@ -959,6 +959,7 @@ export default function Home() {
                 email={email}
                 onEmailChange={(e: string) => setEmail(e)}
                 onCheckout={(p: any, b: any, em: string) => startCheckout(p, b, em)}
+                entitled={entitled}
               />
             </div>
           )}
