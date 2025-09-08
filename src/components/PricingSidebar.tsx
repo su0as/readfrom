@@ -58,8 +58,8 @@ export default function PricingSidebar({
         {savings > 0 && <div className="badge-sale mt-2">Save {savings}%</div>}
 
         <div className="mt-4 space-y-2">
-          <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={email} onInput={(e) => onEmailChange((e.target as HTMLInputElement).value)} aria-label="Your email" />
-          <button type="button" className="btn btn-primary w-full" onClick={() => { const em = (ref.current?.value || '').trim(); if (!/.+@.+\..+/.test(em)) return; onCheckout(plan, billing, em); }}>Subscribe</button>
+          <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={email} aria-label="Your email" />
+          <button type="button" className="btn btn-primary w-full" onClick={() => { const em = (ref.current?.value || '').trim(); if (!/.+@.+\..+/.test(em)) return; onEmailChange(em); onCheckout(plan, billing, em); }}>Subscribe</button>
         </div>
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">
