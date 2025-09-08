@@ -57,6 +57,19 @@ async function tryJson(url: string, token: string) {
   return r.json();
 }
 
+function normalizeList(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.items)) return data.items;
+  // Some APIs return object with paging and an array at a custom key, fallback to values filter
+  if (data && typeof data === 'object') {
+    const arrays = Object.values(data).filter((x) => Array.isArray(x)) as any[];
+    if (arrays.length) return arrays[0] as any[];
+  }
+  return [data];
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.WHOP_API_KEY) return NextResponse.json({ ok: false, reason: 'no api key' }, { status: 501 });
@@ -66,28 +79,36 @@ export async function POST(req: NextRequest) {
     const receiptId = (body?.receiptId || '').toString().trim();
     const planId = (body?.planId || '').toString().trim();
 
-    const bases = [
-      // likely v5 hosts
-      'https://api.whop.com/v5',
-      'https://api.whop.com',
-    ];
+    const v5 = ['https://api.whop.com/v5', 'https://api.whop.com'];
+    const v2 = ['https://api.whop.com/api/v2'];
 
     // Candidate fetchers — we try a few common patterns defensively
     const attempts: Array<() => Promise<any>> = [];
 
     if (receiptId) {
-      for (const b of bases) {
+      for (const b of v5) {
         attempts.push(() => tryJson(`${b}/receipts/${encodeURIComponent(receiptId)}`, token));
         attempts.push(() => tryJson(`${b}/checkouts/${encodeURIComponent(receiptId)}`, token));
         attempts.push(() => tryJson(`${b}/orders/${encodeURIComponent(receiptId)}`, token));
       }
+      for (const b of v2) {
+        attempts.push(() => tryJson(`${b}/memberships/${encodeURIComponent(receiptId)}`, token));
+        attempts.push(() => tryJson(`${b}/orders/${encodeURIComponent(receiptId)}`, token));
+      }
     }
     if (email) {
-      for (const b of bases) {
+      for (const b of v5) {
         attempts.push(() => tryJson(`${b}/memberships?email=${encodeURIComponent(email)}`, token));
         attempts.push(() => tryJson(`${b}/customers?email=${encodeURIComponent(email)}`, token));
         attempts.push(() => tryJson(`${b}/licenses?email=${encodeURIComponent(email)}`, token));
         attempts.push(() => tryJson(`${b}/orders?email=${encodeURIComponent(email)}`, token));
+      }
+      for (const b of v2) {
+        attempts.push(() => tryJson(`${b}/memberships?email=${encodeURIComponent(email)}`, token));
+        attempts.push(() => tryJson(`${b}/memberships?user_email=${encodeURIComponent(email)}`, token));
+        attempts.push(() => tryJson(`${b}/memberships?customer_email=${encodeURIComponent(email)}`, token));
+        // Unfiltered list (fallback): filter by email client-side
+        attempts.push(() => tryJson(`${b}/memberships`, token));
       }
     }
 
@@ -98,15 +119,18 @@ export async function POST(req: NextRequest) {
       try {
         const data = await fn();
         // Normalize response into an array of candidate items
-        const list = Array.isArray(data) ? data : Array.isArray((data as any).data) ? (data as any).data : [data];
+        const list = normalizeList(data);
         for (const item of list) {
           const e = readEmail(item);
           const active = isActive(item);
           const pe = readPeriodEndMs(item);
-          const pid = String(item?.plan_id || item?.planId || item?.attributes?.plan_id || '');
+          const pid = String(item?.plan_id || item?.planId || item?.attributes?.plan_id || item?.plan || '');
+          const valid = item?.valid === true || active;
           const planOk = !planId || !pid || pid === planId;
-          if (e && active && planOk) {
-            verifiedEmail = e; verifiedPeriodEnd = pe; break;
+          if (e && valid && planOk) {
+            verifiedEmail = e;
+            verifiedPeriodEnd = pe ?? (typeof item?.expires_at === 'number' ? (item.expires_at < 1e12 ? item.expires_at * 1000 : item.expires_at) : undefined) ?? (typeof item?.renewal_period_end === 'number' ? (item.renewal_period_end < 1e12 ? item.renewal_period_end * 1000 : item.renewal_period_end) : undefined);
+            break;
           }
         }
         if (verifiedEmail) break;
