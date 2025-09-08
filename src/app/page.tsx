@@ -148,13 +148,31 @@ export default function Home() {
       const fs = localStorage.getItem('rf_fontSize') as any; if (fs === 'sm' || fs === 'md' || fs === 'lg') setFontSize(fs);
       const so = localStorage.getItem('rf_sidebarOpen'); if (so === '0' || so === '1') setSidebarOpen(so === '1');
       const ra = localStorage.getItem('rf_readAnim'); if (ra === '1' || ra === '0') setReadAnim(ra === '1');
+      // hydrate last used email for entitlement checks
+      const le = localStorage.getItem('rf_email_last') || '';
+      if (le) setEmail(le);
       // theme is handled in separate hydration effect above
     } catch {}
-    // Fetch entitlement status
-    fetch('/api/entitlements').then(r => r.json()).then((j) => {
-      if (j?.email) setEmail(j.email);
-      if (j?.entitled) setEntitled(true);
-    }).catch(() => {});
+    // Fetch entitlement status (prefer local email if present)
+    (async () => {
+      try {
+        const le = (typeof window !== 'undefined' ? (localStorage.getItem('rf_email_last') || '') : '');
+        const url = le ? `/api/entitlements?email=${encodeURIComponent(le)}` : '/api/entitlements';
+        const r = await fetch(url);
+        const j = await r.json();
+        if (j?.email) setEmail(j.email);
+        if (j?.entitled) { setEntitled(true); return; }
+        // Attempt active verification if we have a local email but not entitled
+        if (le) {
+          try { await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: le }) }); } catch {}
+          try {
+            const r2 = await fetch(`/api/entitlements?email=${encodeURIComponent(le)}`);
+            const j2 = await r2.json();
+            if (j2?.entitled) setEntitled(true);
+          } catch {}
+        }
+      } catch {}
+    })();
   }, []);
 
   // Persist text/settings
@@ -165,6 +183,7 @@ export default function Home() {
   useEffect(() => { localStorage.setItem('rf_fontSize', fontSize); }, [fontSize]);
   useEffect(() => { localStorage.setItem('rf_sidebarOpen', sidebarOpen ? '1' : '0'); }, [sidebarOpen]);
   useEffect(() => { localStorage.setItem('rf_readAnim', readAnim ? '1' : '0'); }, [readAnim]);
+  useEffect(() => { try { if (email) localStorage.setItem('rf_email_last', email); } catch {} }, [email]);
 
   // Auto open/close sidebar based on cursor proximity
   useEffect(() => {
