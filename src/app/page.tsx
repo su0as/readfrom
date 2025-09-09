@@ -102,6 +102,8 @@ export default function Home() {
   const entitledRef = useRef<boolean>(false);
   useEffect(() => { entitledRef.current = entitled; }, [entitled]);
   const [email, setEmail] = useState<string>("");
+  // Entitlement details (plan/expiry) for UI
+  const [entInfo, setEntInfo] = useState<{ planId?: string; periodEnd?: number } | null>(null);
   // Pricing modal state
   const [showPricing, setShowPricing] = useState<boolean>(false);
   const [modalContext, setModalContext] = useState<'play' | 'preview-expired' | 'sidebar' | 'generic'>("generic");
@@ -161,6 +163,7 @@ export default function Home() {
         const r = await fetch(url);
         const j = await r.json();
         if (j?.email) setEmail(j.email);
+        if (j?.entitlement) setEntInfo({ planId: j.entitlement.planId, periodEnd: j.entitlement.periodEnd });
         if (j?.entitled) { setEntitled(true); return; }
         // Attempt active verification if we have a local email but not entitled
         if (le) {
@@ -168,6 +171,7 @@ export default function Home() {
           try {
             const r2 = await fetch(`/api/entitlements?email=${encodeURIComponent(le)}`);
             const j2 = await r2.json();
+            if (j2?.entitlement) setEntInfo({ planId: j2.entitlement.planId, periodEnd: j2.entitlement.periodEnd });
             if (j2?.entitled) setEntitled(true);
           } catch {}
         }
@@ -969,8 +973,21 @@ export default function Home() {
             )}
           </div>
 
-          {/* Subscribe card for non-entitled users */}
-          {!entitled && (
+          {/* Active plan summary or subscribe card */}
+          {entitled ? (
+            <div className="mt-2 card">
+              <h4 className="font-semibold mb-1">Active plan</h4>
+              <div className="text-sm opacity-85">
+                <div>Email: {email || '—'}</div>
+                <div>Plan: {entInfo?.planId || '—'}</div>
+                <div>
+                  {typeof entInfo?.periodEnd === 'number'
+                    ? `Expires: ${new Date(entInfo!.periodEnd!).toLocaleDateString()}`
+                    : 'No expiry'}
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className="mt-2">
               <PricingSidebar
                 billing={sideBilling as any}
@@ -978,7 +995,7 @@ export default function Home() {
                 email={email}
                 onEmailChange={(e: string) => setEmail(e)}
                 onCheckout={(p: any, b: any, em: string) => startCheckout(p, b, em)}
-                entitled={entitled}
+                entitled={false}
               />
             </div>
           )}
