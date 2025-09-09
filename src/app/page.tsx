@@ -11,7 +11,7 @@ import { VOICES } from "@/components/voices";
 import PricingModal from "@/components/PricingModal";
 import PricingSidebar from "@/components/PricingSidebar";
 import Onboarding from "@/components/Onboarding";
-import { startCheckout } from "@/utils/checkout";
+import { startCheckout, planLabelFromId } from "@/utils/checkout";
 
 // Debug toggle: set window.DEBUG_FOCUS = true in console to enable verbose logs
 const DEBUG_FOCUS: boolean = typeof window !== 'undefined' && !!(window as any).DEBUG_FOCUS;
@@ -164,7 +164,19 @@ export default function Home() {
         const j = await r.json();
         if (j?.email) setEmail(j.email);
         if (j?.entitlement) setEntInfo({ planId: j.entitlement.planId, periodEnd: j.entitlement.periodEnd });
-        if (j?.entitled) { setEntitled(true); return; }
+        if (j?.entitled) {
+          setEntitled(true);
+          // Enrich missing planId with a background verify if absent
+          if (!j?.entitlement?.planId && (j?.email || le)) {
+            try {
+              await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: j?.email || le }) });
+              const r3 = await fetch(`/api/entitlements?email=${encodeURIComponent(j?.email || le)}`);
+              const j3 = await r3.json();
+              if (j3?.entitlement) setEntInfo({ planId: j3.entitlement.planId, periodEnd: j3.entitlement.periodEnd });
+            } catch {}
+          }
+          return;
+        }
         // Attempt active verification if we have a local email but not entitled
         if (le) {
           try { await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: le }) }); } catch {}
@@ -979,7 +991,7 @@ export default function Home() {
               <h4 className="font-semibold mb-1">Active plan</h4>
               <div className="text-sm opacity-85">
                 <div>Email: {email || '—'}</div>
-                <div>Plan: {entInfo?.planId || '—'}</div>
+                <div>Plan: {planLabelFromId(entInfo?.planId) || entInfo?.planId || '—'}</div>
                 <div>
                   {typeof entInfo?.periodEnd === 'number'
                     ? `Expires: ${new Date(entInfo!.periodEnd!).toLocaleDateString()}`

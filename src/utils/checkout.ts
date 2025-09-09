@@ -99,3 +99,33 @@ export function startCheckout(plan: Plan, billing: Billing, email?: string) {
   if (typeof window !== "undefined") window.location.href = url;
 }
 
+// Extract plan id from a Whop checkout URL like .../plan_XXXX?...  -> returns plan_XXXX
+function planIdFromUrl(u?: string): string | null {
+  if (!u) return null;
+  try {
+    const url = new URL(u);
+    const m = url.pathname.match(/\/plan_[A-Za-z0-9]+/);
+    return m ? m[0].slice(1) : null;
+  } catch {
+    // raw string fallback
+    const m = u.match(/\/plan_[A-Za-z0-9]+/);
+    return m ? m[0].slice(1) : null;
+  }
+}
+
+export function planLabelFromId(id?: string | null): string | null {
+  if (!id) return null;
+  const map = new Map<string, string>();
+  const entries: Array<[string | undefined, string]> = [
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY"), "Basic Monthly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY"), "Basic Yearly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY"), "Pro Monthly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY"), "Pro Yearly"],
+  ];
+  for (const [u, label] of entries) {
+    const pid = planIdFromUrl(u);
+    if (pid) map.set(pid, label);
+  }
+  return map.get(id) || null;
+}
+
