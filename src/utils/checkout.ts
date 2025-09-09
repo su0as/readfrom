@@ -129,3 +129,18 @@ export function planLabelFromId(id?: string | null): string | null {
   return map.get(id) || null;
 }
 
+export function planTierFromId(id?: string | null): 'basic' | 'pro' | null {
+  if (!id) return null;
+  const pairs: Array<[string | undefined, 'basic' | 'pro']> = [
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY"), 'basic'],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY"), 'basic'],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY"), 'pro'],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY"), 'pro'],
+  ];
+  for (const [u, tier] of pairs) {
+    const pid = planIdFromUrl(u);
+    if (pid && pid === id) return tier;
+  }
+  return null;
+}
+

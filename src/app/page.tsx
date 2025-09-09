@@ -11,7 +11,7 @@ import { VOICES } from "@/components/voices";
 import PricingModal from "@/components/PricingModal";
 import PricingSidebar from "@/components/PricingSidebar";
 import Onboarding from "@/components/Onboarding";
-import { startCheckout, planLabelFromId } from "@/utils/checkout";
+import { startCheckout, planLabelFromId, planTierFromId } from "@/utils/checkout";
 
 // Debug toggle: set window.DEBUG_FOCUS = true in console to enable verbose logs
 const DEBUG_FOCUS: boolean = typeof window !== 'undefined' && !!(window as any).DEBUG_FOCUS;
@@ -998,6 +998,12 @@ export default function Home() {
                     : 'No expiry'}
                 </div>
               </div>
+              {/* Upgrade option if currently on Basic (or unknown) */}
+              {planTierFromId(entInfo?.planId) !== 'pro' && (
+                <div className="mt-2">
+                  <button className="btn btn-primary w-full" onClick={() => { setModalContext('sidebar'); setShowPricing(true); }}>Upgrade to Pro</button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mt-2">
