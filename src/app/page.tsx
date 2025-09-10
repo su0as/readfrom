@@ -998,12 +998,24 @@ export default function Home() {
                     : 'No expiry'}
                 </div>
               </div>
-              {/* Upgrade option if currently on Basic (or unknown) */}
-              {planTierFromId(entInfo?.planId) !== 'pro' && (
-                <div className="mt-2">
-                  <button className="btn btn-primary w-full" onClick={() => { setModalContext('sidebar'); setShowPricing(true); }}>Upgrade to Pro</button>
-                </div>
-              )}
+              <div className="mt-2 flex gap-2">
+                <button className="btn" onClick={async () => {
+                  try {
+                    const em = email.trim(); if (!em) return;
+                    await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) });
+                    const r3 = await fetch(`/api/entitlements?email=${encodeURIComponent(em)}`);
+                    const j3 = await r3.json();
+                    if (j3?.entitled) {
+                      setEntitled(true);
+                      if (j3?.entitlement) setEntInfo({ planId: j3.entitlement.planId, periodEnd: j3.entitlement.periodEnd });
+                    }
+                  } catch {}
+                }}>Verify now</button>
+                {/* Upgrade option if currently on Basic (or unknown) */}
+                {planTierFromId(entInfo?.planId) !== 'pro' && (
+                  <button className="btn btn-primary" onClick={() => { setModalContext('sidebar'); setShowPricing(true); }}>Upgrade to Pro</button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="mt-2">
