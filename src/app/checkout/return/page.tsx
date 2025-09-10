@@ -17,6 +17,7 @@ export default function CheckoutReturnPage() {
     if (em) {
       setEmail(em);
       try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
+      try { localStorage.setItem('rf_email_last', em); } catch {}
     }
     const toCheck: string = (em || (typeof document !== 'undefined'
       ? decodeURIComponent(document.cookie.match(/(?:^|; )rf_email=([^;]+)/)?.[1] || '')
@@ -95,6 +96,7 @@ export default function CheckoutReturnPage() {
                 if (j?.entitled) {
                   setStatus("entitled");
                   setMessage("All set — your access is unlocked.");
+                  try { localStorage.setItem('rf_email_last', em); } catch {}
                   setTimeout(redirectHome, 1000);
                 } else {
                   setStatus("not_found");
