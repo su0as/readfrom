@@ -984,6 +984,40 @@ export default function Home() {
               </>
             )}
           </div>
+          {/* Pro features below controls */}
+          <div className="mt-2 card">
+            <h4 className="font-semibold mb-1">Pro Features</h4>
+            <div className="flex flex-col gap-2">
+              {/* Determine if current plan is Pro */}
+              { (entitled && (planTierFromId(entInfo?.planId) === 'pro')) ? (
+                <>
+                  <button className="btn" onClick={async () => {
+                    try {
+                      const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice, speed, container: 'mp3', email }) });
+                      const j = await res.json();
+                      if (!res.ok) { alert(j?.error || 'Export failed'); return; }
+                      window.open(j.downloadUrl, '_blank');
+                    } catch (e) { alert('Export failed'); }
+                  }}>Export MP3</button>
+                  <button className="btn" onClick={async () => {
+                    try {
+                      const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice, speed, container: 'mp3', email }) });
+                      const j = await res.json();
+                      if (!res.ok) { alert(j?.error || 'Export failed'); return; }
+                      const code = j.embedCode as string;
+                      try { await navigator.clipboard.writeText(code); alert('Embed code copied'); } catch { alert(code); }
+                    } catch (e) { alert('Embed failed'); }
+                  }}>Get Embed Code</button>
+                </>
+              ) : (
+                <>
+                  <button className="btn" disabled title="Pro only">Export MP3 (Pro)</button>
+                  <button className="btn" disabled title="Pro only">Get Embed Code (Pro)</button>
+                  <button className="btn btn-primary" onClick={() => { setModalContext('sidebar'); setShowPricing(true); }}>Upgrade to Pro</button>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* Active plan summary or subscribe card */}
           {entitled ? (
