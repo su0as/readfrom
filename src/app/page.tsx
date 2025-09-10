@@ -1017,6 +1017,32 @@ export default function Home() {
               />
             </div>
           )}
+
+          {/* Pro tools for active Pro plans */}
+          {entitled && planTierFromId(entInfo?.planId) === 'pro' && (
+            <div className="mt-2 card">
+              <h4 className="font-semibold mb-1">Pro Tools</h4>
+              <div className="flex flex-col gap-2">
+                <button className="btn" onClick={async () => {
+                  try {
+                    const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice, speed, container: 'mp3', email }) });
+                    const j = await res.json();
+                    if (!res.ok) { alert(j?.error || 'Export failed'); return; }
+                    window.open(j.downloadUrl, '_blank');
+                  } catch (e) { alert('Export failed'); }
+                }}>Export MP3</button>
+                <button className="btn" onClick={async () => {
+                  try {
+                    const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice, speed, container: 'mp3', email }) });
+                    const j = await res.json();
+                    if (!res.ok) { alert(j?.error || 'Export failed'); return; }
+                    const code = j.embedCode as string;
+                    try { await navigator.clipboard.writeText(code); alert('Embed code copied'); } catch { alert(code); }
+                  } catch (e) { alert('Embed failed'); }
+                }}>Get Embed Code</button>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
