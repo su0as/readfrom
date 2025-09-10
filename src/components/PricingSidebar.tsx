@@ -26,6 +26,7 @@ export default function PricingSidebar({
   onEmailChange,
   onCheckout,
   entitled = false,
+  onVerified,
 }: {
   billing: Billing;
   onBillingChange: (b: Billing) => void;
@@ -33,6 +34,7 @@ export default function PricingSidebar({
   onEmailChange: (v: string) => void;
   onCheckout: (p: Plan, b: Billing, email: string) => void;
   entitled?: boolean;
+  onVerified?: (info?: { planId?: string; periodEnd?: number }) => void;
 }) {
   const { format } = useUsdToLocal();
 
@@ -60,6 +62,25 @@ export default function PricingSidebar({
         <div className="mt-4 space-y-2">
           <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={email} aria-label="Your email" />
           <button type="button" className="btn btn-primary w-full" onClick={() => { const em = (ref.current?.value || '').trim(); if (!/.+@.+\..+/.test(em)) return; onEmailChange(em); onCheckout(plan, billing, em); }}>Subscribe</button>
+          <button type="button" className="btn w-full" onClick={async () => {
+            const em = (ref.current?.value || '').trim(); if (!/.+@.+\..+/.test(em)) return;
+            try {
+              await fetch('/api/whop/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: em })});
+              const r = await fetch(`/api/entitlements?email=${encodeURIComponent(em)}`);
+              const j = await r.json();
+              if (j?.entitled) {
+                try { localStorage.setItem('rf_email_last', em); } catch {}
+                onEmailChange(em);
+                onVerified?.(j?.entitlement ? { planId: j.entitlement.planId, periodEnd: j.entitlement.periodEnd } : undefined);
+                alert('Verified. Reloading…');
+                try { window.location.reload(); } catch {}
+              } else {
+                alert('No active purchase found for this email.');
+              }
+            } catch (e) {
+              alert('Verification failed');
+            }
+          }}>Verify now</button>
         </div>
 
         <ul className="text-sm opacity-90 mt-3 list-disc ml-5">

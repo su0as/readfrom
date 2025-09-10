@@ -1026,6 +1026,10 @@ export default function Home() {
                 onEmailChange={(e: string) => setEmail(e)}
                 onCheckout={(p: any, b: any, em: string) => startCheckout(p, b, em)}
                 entitled={false}
+                onVerified={(info) => {
+                  if (info) setEntInfo(info);
+                  setEntitled(true);
+                }}
               />
             </div>
           )}
