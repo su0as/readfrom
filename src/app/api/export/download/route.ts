@@ -16,15 +16,32 @@ export async function GET(req: NextRequest) {
     if (!specRaw) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const spec = JSON.parse(specRaw) as { text: string; voice: string; speed: number; container: 'mp3' | 'ogg' };
 
-    // Call our TTS route in audio format to get segments
-    const r = await fetch(`${req.nextUrl.origin}/api/tts`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: spec.text, voice: spec.voice, speed: spec.speed, format: 'audio', container })
-    });
-    if (!r.ok) return NextResponse.json({ error: 'TTS failed' }, { status: 500 });
-    const j = await r.json();
-    const segs = (j.segments || []) as { audioBase64: string; mime?: string }[];
-    if (!segs.length) return NextResponse.json({ error: 'No audio' }, { status: 500 });
+    // Call our TTS route in audio format to get segments (use same-origin URL reliably)
+    const ttsUrl = new URL('/api/tts', req.url);
+    const r = await fetch(ttsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: spec.text, voice: spec.voice, speed: spec.speed, format: 'audio', container }),
+      cache: 'no-store',
+    } as RequestInit);
+
+    // Read raw text first, then parse to avoid throwing opaque JSON errors
+    const raw = await r.text();
+    if (!r.ok) {
+      // Surface TTS response body for easier debugging
+      const snippet = raw ? raw.slice(0, 500) : '';
+      return NextResponse.json({ error: 'TTS failed', details: snippet || undefined }, { status: 500 });
+    }
+    let j: any = null;
+    try {
+      j = raw ? JSON.parse(raw) : null;
+    } catch (err: any) {
+      const snippet = raw ? raw.slice(0, 500) : '';
+      return NextResponse.json({ error: 'TTS returned non-JSON', details: snippet || undefined }, { status: 500 });
+    }
+
+    const segs = (j?.segments || []) as { audioBase64: string; mime?: string }[];
+    if (!Array.isArray(segs) || !segs.length) return NextResponse.json({ error: 'No audio' }, { status: 500 });
 
     // Concatenate buffers naïvely (works for most MP3/OGG players; for perfection use a muxer)
     const bufs = segs.map((s) => Buffer.from(s.audioBase64, 'base64'));
@@ -37,7 +54,7 @@ export async function GET(req: NextRequest) {
         'Content-Type': mime,
         'Content-Length': String(full.byteLength),
         'Cache-Control': 'public, max-age=31536000, immutable',
-        'Content-Disposition': `inline; filename="readto.${container === 'ogg' ? 'ogg' : 'mp3'}"`,
+        'Content-Disposition': `attachment; filename="readto.${container === 'ogg' ? 'ogg' : 'mp3'}"`,
       }
     });
   } catch (e: any) {

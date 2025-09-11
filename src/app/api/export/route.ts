@@ -15,17 +15,31 @@ function randId(len = 22) {
 
 function planTierFromPlanId(planId?: string | null): 'basic' | 'pro' | null {
   const env = (name: string) => (process.env as Record<string, string | undefined>)[name];
-  const pairs: Array<[string | undefined, 'basic' | 'pro']> = [
-    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY'), 'basic'],
-    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY'), 'basic'],
-    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY'), 'pro'],
-    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY'), 'pro'],
+  // Fallback links (must mirror utils/checkout.ts FALLBACK_LINKS)
+  const FALLBACK_LINKS: Record<string, string> = {
+    BASIC_MONTHLY: 'https://whop.com/checkout/plan_WuQ9oNNUPtoqW?d2c=true',
+    BASIC_YEARLY: 'https://whop.com/checkout/plan_UREUrsMIXAO1N?d2c=true',
+    PRO_MONTHLY: 'https://whop.com/checkout/plan_o9jbTY2jmGRo8?d2c=true',
+    PRO_YEARLY: 'https://whop.com/checkout/plan_DWncFUzXGw4Cc?d2c=true',
+  };
+  const candidates: Array<[string | undefined, 'basic' | 'pro']> = [
+    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY') || FALLBACK_LINKS.BASIC_MONTHLY, 'basic'],
+    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY') || FALLBACK_LINKS.BASIC_YEARLY, 'basic'],
+    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY') || FALLBACK_LINKS.PRO_MONTHLY, 'pro'],
+    [env('NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY') || FALLBACK_LINKS.PRO_YEARLY, 'pro'],
   ];
   function planIdFromUrl(u?: string) {
     if (!u) return null;
-    try { const url = new URL(u); const m = url.pathname.match(/\/plan_[A-Za-z0-9]+/); return m ? m[0].slice(1) : null; } catch { const m = u.match(/\/plan_[A-Za-z0-9]+/); return m ? m[0].slice(1) : null; }
+    try {
+      const url = new URL(u);
+      const m = url.pathname.match(/\/plan_[A-Za-z0-9]+/);
+      return m ? m[0].slice(1) : null;
+    } catch {
+      const m = u.match(/\/plan_[A-Za-z0-9]+/);
+      return m ? m[0].slice(1) : null;
+    }
   }
-  for (const [u, tier] of pairs) {
+  for (const [u, tier] of candidates) {
     const pid = planIdFromUrl(u);
     if (pid && pid === planId) return tier;
   }
@@ -34,23 +48,37 @@ function planTierFromPlanId(planId?: string | null): 'basic' | 'pro' | null {
 
 export async function POST(req: NextRequest) {
   try {
-    // Be tolerant of non-JSON bodies from some clients
-    let body: any = null;
+    // Fully tolerant body parsing: read raw text first, then interpret based on Content-Type
+    const ct = (req.headers.get('content-type') || '').toLowerCase();
+    let body: any = {};
+    let raw = '';
     try {
-      body = await req.json();
+      raw = await req.text();
     } catch {
-      try {
-        const clone = req.clone();
-        const raw = await clone.text();
+      raw = '';
+    }
+
+    if (raw) {
+      const tryParseJson = () => {
         try {
-          body = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          // If JSON is a primitive (e.g., a string), ignore — we expect an object
+          return parsed && typeof parsed === 'object' ? parsed : {};
         } catch {
-          // Try URL-encoded fallback
-          const params = new URLSearchParams(raw);
-          body = Object.fromEntries(params.entries());
+          return null;
         }
-      } catch {
-        body = {};
+      };
+
+      if (ct.includes('application/json') || ct.includes('+json')) {
+        body = tryParseJson() ?? {};
+      } else if (ct.includes('application/x-www-form-urlencoded')) {
+        try { const params = new URLSearchParams(raw); body = Object.fromEntries(params.entries()); } catch { body = {}; }
+      } else {
+        // Heuristics: attempt JSON first, then URL-encoded; else treat as empty
+        const maybe = tryParseJson();
+        if (maybe) body = maybe; else {
+          try { const params = new URLSearchParams(raw); body = Object.fromEntries(params.entries()); } catch { body = {}; }
+        }
       }
     }
 
@@ -60,7 +88,7 @@ export async function POST(req: NextRequest) {
     const container = (String((body as any)?.container || 'mp3') === 'ogg' ? 'ogg' : 'mp3') as 'mp3' | 'ogg';
     if (!text || !voice || !speed) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
-    const email = req.cookies.get('rf_email')?.value || String(body?.email || '');
+    const email = String((body as any)?.email || req.cookies.get('rf_email')?.value || '');
     if (!email) return NextResponse.json({ error: 'No email' }, { status: 401 });
     let ent = await getEntitlement(email);
     if (!ent || ent.status !== 'active') return NextResponse.json({ error: 'Not entitled' }, { status: 403 });
