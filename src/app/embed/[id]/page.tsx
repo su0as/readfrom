@@ -2,10 +2,10 @@ import { storeGet } from '@/utils/blobStore';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EmbedPage({ params }: { params: { id: string } }) {
+export default async function EmbedPage({ params }: { params: { id: string } }): Promise<JSX.Element> {
   const id = params.id;
   const specRaw = await storeGet(`rf:spec:${id}`);
-  if (!specRaw) return (<div style={{ padding: 16, fontFamily: 'sans-serif' }}>Not found</div> as any);
+  if (!specRaw) return (<div style={{ padding: 16, fontFamily: 'sans-serif' }}>Not found</div>);
   const spec = JSON.parse(specRaw) as { container: 'mp3' | 'ogg' };
   const url = `/api/export/download?id=${encodeURIComponent(id)}&container=${spec.container || 'mp3'}`;
   return (

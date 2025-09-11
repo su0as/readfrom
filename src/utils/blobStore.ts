@@ -2,7 +2,7 @@
    Keys are stored with TTL in seconds. */
 import { Redis } from '@upstash/redis';
 
-let MEM = new Map<string, { v: string; exp: number }>();
+const MEM = new Map<string, { v: string; exp: number }>();
 
 function getRedis(): Redis | null {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
