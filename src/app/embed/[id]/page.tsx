@@ -2,8 +2,9 @@ import { storeGet } from '@/utils/blobStore';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EmbedPage({ params }: { params: { id: string } }): Promise<JSX.Element> {
-  const id = params.id;
+// Next.js 15 PageProps defines `params` as a Promise for dynamic routes
+export default async function EmbedPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const specRaw = await storeGet(`rf:spec:${id}`);
   if (!specRaw) return (<div style={{ padding: 16, fontFamily: 'sans-serif' }}>Not found</div>);
   const spec = JSON.parse(specRaw) as { container: 'mp3' | 'ogg' };
