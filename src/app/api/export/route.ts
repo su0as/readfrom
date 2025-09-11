@@ -34,11 +34,30 @@ function planTierFromPlanId(planId?: string | null): 'basic' | 'pro' | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const text = String(body?.text || '').trim();
-    const voice = String(body?.voice || '').trim();
-    const speed = Number(body?.speed || 1);
-    const container = (String(body?.container || 'mp3') === 'ogg' ? 'ogg' : 'mp3') as 'mp3' | 'ogg';
+    // Be tolerant of non-JSON bodies from some clients
+    let body: any = null;
+    try {
+      body = await req.json();
+    } catch {
+      try {
+        const clone = req.clone();
+        const raw = await clone.text();
+        try {
+          body = JSON.parse(raw);
+        } catch {
+          // Try URL-encoded fallback
+          const params = new URLSearchParams(raw);
+          body = Object.fromEntries(params.entries());
+        }
+      } catch {
+        body = {};
+      }
+    }
+
+    const text = String((body as any)?.text || '').trim();
+    const voice = String((body as any)?.voice || '').trim();
+    const speed = Number((body as any)?.speed || 1);
+    const container = (String((body as any)?.container || 'mp3') === 'ogg' ? 'ogg' : 'mp3') as 'mp3' | 'ogg';
     if (!text || !voice || !speed) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
 
     const email = req.cookies.get('rf_email')?.value || String(body?.email || '');
