@@ -112,37 +112,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let verifiedEmail: string | null = null;
-    let verifiedPeriodEnd: number | undefined;
+  let verifiedEmail: string | null = null;
+  let verifiedPeriodEnd: number | undefined;
+  let verifiedPlanId: string | undefined;
 
-    for (const fn of attempts) {
-      try {
-        const data = await fn();
-        // Normalize response into an array of candidate items
-        const list = normalizeList(data);
-        for (const item of list) {
-          const e = readEmail(item);
-          const active = isActive(item);
-          const pe = readPeriodEndMs(item);
-          const pid = String(item?.plan_id || item?.planId || item?.attributes?.plan_id || item?.plan || '');
-          const valid = item?.valid === true || active;
-          const planOk = !planId || !pid || pid === planId;
-          if (e && valid && planOk) {
-            verifiedEmail = e;
-            verifiedPeriodEnd = pe ?? (typeof item?.expires_at === 'number' ? (item.expires_at < 1e12 ? item.expires_at * 1000 : item.expires_at) : undefined) ?? (typeof item?.renewal_period_end === 'number' ? (item.renewal_period_end < 1e12 ? item.renewal_period_end * 1000 : item.renewal_period_end) : undefined);
-            break;
-          }
+  for (const fn of attempts) {
+    try {
+      const data = await fn();
+      // Normalize response into an array of candidate items
+      const list = normalizeList(data);
+      for (const item of list) {
+        const e = readEmail(item);
+        const active = isActive(item);
+        const pe = readPeriodEndMs(item);
+        const pid = String(item?.plan_id || item?.planId || item?.attributes?.plan_id || item?.plan || '');
+        const valid = item?.valid === true || active;
+        const planOk = !planId || !pid || pid === planId;
+        if (e && valid && planOk) {
+          verifiedEmail = e;
+          verifiedPeriodEnd = pe ?? (typeof item?.expires_at === 'number' ? (item.expires_at < 1e12 ? item.expires_at * 1000 : item.expires_at) : undefined) ?? (typeof item?.renewal_period_end === 'number' ? (item.renewal_period_end < 1e12 ? item.renewal_period_end * 1000 : item.renewal_period_end) : undefined);
+          if (pid) verifiedPlanId = pid;
+          break;
         }
-        if (verifiedEmail) break;
-      } catch {
-        // ignore and try next
       }
+      if (verifiedEmail) break;
+    } catch {
+      // ignore and try next
     }
+  }
 
-    if (!verifiedEmail) return NextResponse.json({ ok: false, reason: 'not verified' }, { status: 404 });
+  if (!verifiedEmail) return NextResponse.json({ ok: false, reason: 'not verified' }, { status: 404 });
 
-    await setEntitlement({ email: verifiedEmail, status: 'active', source: 'whop', updatedAt: Date.now(), planId: planId || undefined, periodEnd: verifiedPeriodEnd });
-    return NextResponse.json({ ok: true, email: verifiedEmail, periodEnd: verifiedPeriodEnd });
+  await setEntitlement({ email: verifiedEmail, status: 'active', source: 'whop', updatedAt: Date.now(), planId: verifiedPlanId || (planId || undefined), periodEnd: verifiedPeriodEnd });
+  return NextResponse.json({ ok: true, email: verifiedEmail, periodEnd: verifiedPeriodEnd, planId: verifiedPlanId });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'verify failed' }, { status: 500 });
   }

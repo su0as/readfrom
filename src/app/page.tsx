@@ -313,11 +313,8 @@ export default function Home() {
     const v = opts?.voice ?? voice;
     const sp = opts?.speed ?? speed;
     const ttxt = opts?.text ?? text;
-    const cont = opts?.container ?? (typeof window !== 'undefined' ? (() => {
-      const el = document.createElement('audio');
-      const can = el.canPlayType('audio/ogg; codecs=opus');
-      return can !== '' ? 'ogg' : 'mp3';
-    })() : 'ogg');
+    // Force MP3 for more robust playback across browsers and to avoid artifacts between segments
+    const cont = opts?.container ?? 'mp3';
     containerRef.current = cont;
     fallbackTriedRef.current = false;
 
@@ -476,7 +473,7 @@ export default function Home() {
     if (previewLoading) return;
     setPreviewLoading(true);
     try {
-      const cont = (typeof window !== 'undefined') ? (() => { const a = document.createElement('audio'); const can = a.canPlayType('audio/ogg; codecs=opus'); return can !== '' ? 'ogg' : 'mp3'; })() : 'ogg';
+      const cont = 'mp3';
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -488,7 +485,7 @@ export default function Home() {
       if (!segs.length) return;
       if (!previewAudioRef.current && typeof window !== 'undefined') previewAudioRef.current = new Audio();
       const aud = previewAudioRef.current!;
-      const mimeDefault = cont === 'ogg' ? 'audio/ogg; codecs=opus' : 'audio/mpeg';
+      const mimeDefault = 'audio/mpeg';
       aud.src = `data:${segs[0].mime || mimeDefault};base64,${segs[0].audioBase64}`;
       await aud.play().catch(() => {});
     } finally {
