@@ -1,11 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { setEntitlement } from "@/utils/entitlements";
+import { storeGet, storeSet } from "@/utils/blobStore";
+import { createHmac, timingSafeEqual, createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 
-// NOTE: This is a scaffold. We'll wire real signature verification once you provide WHOP_WEBHOOK_SECRET
-// and confirm header/algorithm. Until then, it accepts JSON (or form-encoded fallback) and extracts an email.
+// Webhook signature verification (opt-in)
+function verifySignature(raw: Uint8Array, header: string | null, secret: string): boolean {
+  if (!header) return false;
+  // Accept either a plain hex signature or prefixed value like "sha256=..."
+  const expected = createHmac("sha256", secret).update(raw).digest("hex");
+  const got = header.replace(/^sha256=/i, "").trim();
+  try {
+    const a = Buffer.from(expected, "hex");
+    const b = Buffer.from(got, "hex");
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+// Idempotency key derived from raw body
+function bodyDigest(raw: Uint8Array): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
 
 function get(obj: any, path: string[]): any {
   try {
@@ -105,21 +124,40 @@ function extractPeriodEndMs(payload: any): number | undefined {
 
 export async function POST(req: NextRequest) {
   try {
-    // TODO: verify signature header if WHOP_WEBHOOK_SECRET is set
+    const rawAb = await req.arrayBuffer();
+    const raw = new Uint8Array(rawAb);
+
+    // Optional signature verification
+    const secret = process.env.WHOP_WEBHOOK_SECRET;
+    if (secret) {
+      const sig = req.headers.get("x-whop-signature") || req.headers.get("whop-signature");
+      if (!verifySignature(raw, sig, secret)) {
+        return NextResponse.json({ ok: false, reason: "invalid signature" }, { status: 401 });
+      }
+    }
+
+    // Idempotency: ignore duplicates of identical payloads for 24h
+    const digest = bodyDigest(raw);
+    const seenKey = `rf:webhook:seen:${digest}`;
+    const seen = await storeGet(seenKey);
+    if (seen) {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+
+    // Parse body (JSON preferred, fallback to form-encoded)
     let body: any = null;
     try {
-      body = await req.json();
+      body = JSON.parse(new TextDecoder().decode(raw));
     } catch {
-      // Fallback: attempt to parse form-encoded or raw text JSON
       try {
-        const txt = await req.text();
-        try { body = JSON.parse(txt); } catch {
-          const p = new URLSearchParams(txt);
-          const obj: Record<string, any> = {};
-          p.forEach((v, k) => { obj[k] = v; });
-          body = obj;
-        }
-      } catch {}
+        const txt = new TextDecoder().decode(raw);
+        const p = new URLSearchParams(txt);
+        const obj: Record<string, any> = {};
+        p.forEach((v, k) => { obj[k] = v; });
+        body = obj;
+      } catch {
+        body = null;
+      }
     }
     if (!body) return NextResponse.json({ ok: false, reason: "no body" }, { status: 400 });
     const email = extractEmail(body);
@@ -149,6 +187,8 @@ export async function POST(req: NextRequest) {
         planId: body?.plan_id ?? get(body, ["data", "plan_id"]) ?? get(body, ["plan", "id"])?.toString(),
         periodEnd: extractPeriodEndMs(body),
       });
+      // Mark seen on success (24h)
+      await storeSet(seenKey, "1", 24 * 3600);
       return NextResponse.json({ ok: true });
     }
 
@@ -161,6 +201,7 @@ export async function POST(req: NextRequest) {
         productId: body?.product_id ?? get(body, ["data", "product_id"]) ?? get(body, ["product", "id"])?.toString(),
         planId: body?.plan_id ?? get(body, ["data", "plan_id"]) ?? get(body, ["plan", "id"])?.toString(),
       });
+      await storeSet(seenKey, "1", 24 * 3600);
       return NextResponse.json({ ok: true });
     }
 

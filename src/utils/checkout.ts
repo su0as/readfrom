@@ -46,8 +46,10 @@ export function getCheckoutBaseUrl(plan: Plan, billing: Billing): string | null 
 export function setEmailCookie(email: string) {
   if (typeof document === "undefined") return;
   try {
-    document.cookie = `rf_email=${encodeURIComponent(email)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    // Set HttpOnly cookie via server (cannot be read by JS) and store a non-sensitive hint locally
+    fetch('/api/cookies/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
   } catch {}
+  try { localStorage.setItem('rf_email_last', email); } catch {}
 }
 
 function getEmailCookie(): string | null {

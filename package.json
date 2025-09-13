@@ -2,6 +2,10 @@
   "name": "readfrom",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=18.18.0",
+    "pnpm": ">=8"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "check": "pnpm typecheck && pnpm run lint -- . && pnpm test",
+    "secrets:scan": "node scripts/check-client-bundle-for-secrets.mjs"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.3.0",

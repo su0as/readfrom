@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { setEntitlement } from '@/utils/entitlements';
+import { limitByIP } from '@/utils/rateLimit';
+import { isSameOrigin } from '@/utils/origin';
 
 export const runtime = 'nodejs';
 
@@ -72,6 +74,10 @@ function normalizeList(data: any): any[] {
 
 export async function POST(req: NextRequest) {
   try {
+    // Same-origin only and moderate rate limit
+    if (!isSameOrigin(req)) return NextResponse.json({ ok: false, reason: 'forbidden' }, { status: 403 });
+    const { success } = await limitByIP(req, 30, 60);
+    if (!success) return NextResponse.json({ ok: false, reason: 'rate_limited' }, { status: 429 });
     if (!process.env.WHOP_API_KEY) return NextResponse.json({ ok: false, reason: 'no api key' }, { status: 501 });
     const token = process.env.WHOP_API_KEY as string;
     const body = await req.json().catch(() => ({} as any));
