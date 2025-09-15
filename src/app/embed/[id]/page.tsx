@@ -4,21 +4,52 @@ import React from "react";
 
 export const dynamic = "force-dynamic";
 
-export default async function EmbedPage({ params }: { params: { id: string } }) {
-  const id = params.id;
+// Next.js 15 PageProps defines `params` as a Promise for dynamic routes
+export default async function EmbedPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const specRaw = await storeGet(`rf:spec:${id}`);
   if (!specRaw) return notFound();
-  const spec = JSON.parse(specRaw) as { text: string; voice: string; speed: number; container: "mp3" | "ogg" };
+  const spec = JSON.parse(specRaw) as {
+    text: string;
+    voice: string;
+    speed: number;
+    container: "mp3" | "ogg";
+  };
 
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", background: "#fff", color: "#111" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8 }}>
-          <button id="play" style={{ padding: "8px 12px", border: "1px solid #ddd", borderRadius: 8, cursor: "pointer" }}>Play</button>
+      <body
+        style={{
+          margin: 0,
+          fontFamily: "system-ui, sans-serif",
+          background: "#fff",
+          color: "#111",
+        }}
+      >
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: 8 }}
+        >
+          <button
+            id="play"
+            style={{
+              padding: "8px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            Play
+          </button>
           <div style={{ fontSize: 14, opacity: 0.8 }}>ReadFrom player</div>
         </div>
         <audio id="aud" preload="none" />
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function(){
             const btn = document.getElementById('play');
             const aud = document.getElementById('aud');
@@ -36,27 +67,10 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
               } catch { btn.textContent = 'Error'; }
             });
           })();
-        ` }} />
+        `,
+          }}
+        />
       </body>
     </html>
   );
 }
-
-import { storeGet } from '@/utils/blobStore';
-
-export const dynamic = 'force-dynamic';
-
-// Next.js 15 PageProps defines `params` as a Promise for dynamic routes
-export default async function EmbedPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const specRaw = await storeGet(`rf:spec:${id}`);
-  if (!specRaw) return (<div style={{ padding: 16, fontFamily: 'sans-serif' }}>Not found</div>);
-  const spec = JSON.parse(specRaw) as { container: 'mp3' | 'ogg' };
-  const url = `/api/export/download?id=${encodeURIComponent(id)}&container=${spec.container || 'mp3'}`;
-  return (
-    <html lang="en"><body style={{ margin: 0 }}>
-      <audio controls preload="none" style={{ width: '100%' }} src={url} />
-    </body></html>
-  );
-}
-

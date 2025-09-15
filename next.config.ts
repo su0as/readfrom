@@ -30,26 +30,36 @@ const securityHeadersGlobal = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Prefer CSP frame-ancestors over X-Frame-Options for modern browsers; omit XFO globally to allow per-route CSP overrides.
   // { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Permissions-Policy", value: [
-    "accelerometer=()",
-    "ambient-light-sensor=()",
-    "autoplay=(self)",
-    "camera=()",
-    "clipboard-read=(self)",
-    "clipboard-write=(self)",
-    "geolocation=()",
-    "gyroscope=()",
-    "magnetometer=()",
-    "microphone=()",
-    "midi=()",
-    "payment=()",
-    "sync-xhr=()",
-    "usb=()",
-    "fullscreen=(self)",
-  ].join(", ") },
+  {
+    key: "Permissions-Policy",
+    value: [
+      "accelerometer=()",
+      "ambient-light-sensor=()",
+      "autoplay=(self)",
+      "camera=()",
+      "clipboard-read=(self)",
+      "clipboard-write=(self)",
+      "geolocation=()",
+      "gyroscope=()",
+      "magnetometer=()",
+      "microphone=()",
+      "midi=()",
+      "payment=()",
+      "sync-xhr=()",
+      "usb=()",
+      "fullscreen=(self)",
+    ].join(", "),
+  },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
-  ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" } as const] : []),
+  ...(isProd
+    ? [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=31536000; includeSubDomains; preload",
+        } as const,
+      ]
+    : []),
   // Start CSP in Report-Only unless CSP_REPORT_ONLY=0
   process.env.CSP_REPORT_ONLY === "0"
     ? { key: "Content-Security-Policy", value: csp }
@@ -60,8 +70,14 @@ const securityHeadersGlobal = [
 const embedHeaders = [
   // Override CSP to allow framing by any site on /embed/* only
   process.env.CSP_REPORT_ONLY === "0"
-    ? { key: "Content-Security-Policy", value: csp.replace("frame-ancestors 'none'", "frame-ancestors *") }
-    : { key: "Content-Security-Policy-Report-Only", value: csp.replace("frame-ancestors 'none'", "frame-ancestors *") },
+    ? {
+        key: "Content-Security-Policy",
+        value: csp.replace("frame-ancestors 'none'", "frame-ancestors *"),
+      }
+    : {
+        key: "Content-Security-Policy-Report-Only",
+        value: csp.replace("frame-ancestors 'none'", "frame-ancestors *"),
+      },
 ];
 
 const nextConfig: NextConfig = {

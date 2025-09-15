@@ -4,24 +4,43 @@ import { useEffect, useMemo, useState } from "react";
 
 export default function CheckoutReturnPage() {
   const [email, setEmail] = useState<string>("");
-  const [status, setStatus] = useState<"checking" | "entitled" | "not_found" | "error">("checking");
+  const [status, setStatus] = useState<
+    "checking" | "entitled" | "not_found" | "error"
+  >("checking");
   const [message, setMessage] = useState<string>("Verifying your purchase…");
 
-  const redirectHome = () => { window.location.href = "/"; };
+  const redirectHome = () => {
+    window.location.href = "/";
+  };
 
-  const search = useMemo(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null), []);
+  const search = useMemo(
+    () =>
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null,
+    [],
+  );
 
   useEffect(() => {
     if (!search) return;
     const em = search.get("email") || "";
     if (em) {
       setEmail(em);
-      try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
-      try { localStorage.setItem('rf_email_last', em); } catch {}
+      try {
+        document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`;
+      } catch {}
+      try {
+        localStorage.setItem("rf_email_last", em);
+      } catch {}
     }
-    const toCheck: string = (em || (typeof document !== 'undefined'
-      ? decodeURIComponent(document.cookie.match(/(?:^|; )rf_email=([^;]+)/)?.[1] || '')
-      : '')).trim();
+    const toCheck: string = (
+      em ||
+      (typeof document !== "undefined"
+        ? decodeURIComponent(
+            document.cookie.match(/(?:^|; )rf_email=([^;]+)/)?.[1] || "",
+          )
+        : "")
+    ).trim();
     if (!toCheck) {
       setStatus("not_found");
       setMessage("Enter your email to link your purchase.");
@@ -30,7 +49,9 @@ export default function CheckoutReturnPage() {
     let cancelled = false;
     async function once() {
       try {
-        const r = await fetch(`/api/entitlements?email=${encodeURIComponent(toCheck)}`);
+        const r = await fetch(
+          `/api/entitlements?email=${encodeURIComponent(toCheck)}`,
+        );
         const j = await r.json();
         if (cancelled) return;
         if (j?.entitled) {
@@ -41,14 +62,21 @@ export default function CheckoutReturnPage() {
         }
         return false;
       } catch (e: unknown) {
-        if (!cancelled) { setStatus("error"); setMessage(e instanceof Error ? e.message : "Verification failed."); }
+        if (!cancelled) {
+          setStatus("error");
+          setMessage(e instanceof Error ? e.message : "Verification failed.");
+        }
         return false;
       }
     }
     (async () => {
       // Try server-side verification first (active check via Whop API)
       try {
-        await fetch('/api/whop/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: toCheck }) });
+        await fetch("/api/whop/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: toCheck }),
+        });
       } catch {}
       // Then poll up to 60s to allow webhook/verify propagation
       setStatus("checking");
@@ -61,20 +89,29 @@ export default function CheckoutReturnPage() {
       }
       if (!cancelled) {
         setStatus("not_found");
-        setMessage("We couldn't find an active purchase for this email. Try another email or contact support.");
+        setMessage(
+          "We couldn't find an active purchase for this email. Try another email or contact support.",
+        );
       }
     })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search?.toString()]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ gap: 16 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600 }}>Thanks for your purchase</h1>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-6"
+      style={{ gap: 16 }}
+    >
+      <h1 style={{ fontSize: 28, fontWeight: 600 }}>
+        Thanks for your purchase
+      </h1>
       <p style={{ opacity: 0.85 }}>{message}</p>
 
       {(status === "not_found" || status === "error") && (
-        <div style={{ display: 'flex', gap: 8, width: 420, maxWidth: '90%' }}>
+        <div style={{ display: "flex", gap: 8, width: 420, maxWidth: "90%" }}>
           <input
             className="btn"
             style={{ flex: 1 }}
@@ -87,34 +124,47 @@ export default function CheckoutReturnPage() {
             onClick={async () => {
               const em = email.trim();
               if (!em) return;
-              try { document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`; } catch {}
+              try {
+                document.cookie = `rf_email=${encodeURIComponent(em)}; Path=/; SameSite=Lax`;
+              } catch {}
               setStatus("checking");
               setMessage("Verifying your purchase…");
               try {
-                const r = await fetch(`/api/entitlements?email=${encodeURIComponent(em)}`);
+                const r = await fetch(
+                  `/api/entitlements?email=${encodeURIComponent(em)}`,
+                );
                 const j = await r.json();
                 if (j?.entitled) {
                   setStatus("entitled");
                   setMessage("All set — your access is unlocked.");
-                  try { localStorage.setItem('rf_email_last', em); } catch {}
+                  try {
+                    localStorage.setItem("rf_email_last", em);
+                  } catch {}
                   setTimeout(redirectHome, 1000);
                 } else {
                   setStatus("not_found");
-                  setMessage("We couldn't find an active purchase for this email. Try another email.");
+                  setMessage(
+                    "We couldn't find an active purchase for this email. Try another email.",
+                  );
                 }
               } catch (e: unknown) {
                 setStatus("error");
-                setMessage(e instanceof Error ? e.message : "Verification failed.");
+                setMessage(
+                  e instanceof Error ? e.message : "Verification failed.",
+                );
               }
             }}
-          >Link</button>
+          >
+            Link
+          </button>
         </div>
       )}
 
       {status === "entitled" && (
-        <button className="btn" onClick={redirectHome}>Continue</button>
+        <button className="btn" onClick={redirectHome}>
+          Continue
+        </button>
       )}
     </div>
   );
 }
-

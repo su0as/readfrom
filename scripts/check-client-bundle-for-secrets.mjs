@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const root = process.cwd();
-const dir = join(root, '.next');
+const dir = join(root, ".next");
 const patterns = [
   /GOOGLE_[A-Z0-9_]{2,}/,
   /UPSTASH_[A-Z0-9_]{2,}/,
@@ -27,7 +27,7 @@ function main() {
     const files = walk(dir).filter((p) => /static\/.+\.(js|txt|html)/.test(p));
     let bad = [];
     for (const f of files) {
-      const txt = readFileSync(f, 'utf8');
+      const txt = readFileSync(f, "utf8");
       for (const re of patterns) {
         if (re.test(txt)) {
           bad.push({ file: f, pattern: re.toString() });
@@ -35,13 +35,13 @@ function main() {
       }
     }
     if (bad.length) {
-      console.error('Secret-like strings found in client bundle:');
+      console.error("Secret-like strings found in client bundle:");
       for (const b of bad) console.error(` - ${b.file} matches ${b.pattern}`);
       process.exit(1);
     }
-    console.log('✓ No secret-like strings found in client bundle.');
+    console.log("✓ No secret-like strings found in client bundle.");
   } catch (e) {
-    console.warn('Secret scan skipped: ' + (e?.message || e));
+    console.warn("Secret scan skipped: " + (e?.message || e));
   }
 }
 

@@ -7,7 +7,11 @@ import { createHmac, timingSafeEqual, createHash } from "node:crypto";
 export const runtime = "nodejs";
 
 // Webhook signature verification (opt-in)
-function verifySignature(raw: Uint8Array, header: string | null, secret: string): boolean {
+function verifySignature(
+  raw: Uint8Array,
+  header: string | null,
+  secret: string,
+): boolean {
   if (!header) return false;
   // Accept either a plain hex signature or prefixed value like "sha256=..."
   const expected = createHmac("sha256", secret).update(raw).digest("hex");
@@ -28,7 +32,10 @@ function bodyDigest(raw: Uint8Array): string {
 
 function get(obj: any, path: string[]): any {
   try {
-    return path.reduce((acc, key) => (acc && key in acc ? acc[key] : undefined), obj);
+    return path.reduce(
+      (acc, key) => (acc && key in acc ? acc[key] : undefined),
+      obj,
+    );
   } catch {
     return undefined;
   }
@@ -55,7 +62,9 @@ function extractEmail(payload: any): string | null {
     get(payload, ["resource", "email"]),
     get(payload, ["attributes", "email"]),
   ];
-  const found = candidates.find((v) => typeof v === "string" && v.includes("@"));
+  const found = candidates.find(
+    (v) => typeof v === "string" && v.includes("@"),
+  );
   if (found) return found as string;
   // 2) Deep scan: prefer keys that include 'email', else any string containing '@'
   const seen = new Set<any>();
@@ -83,22 +92,45 @@ function extractEmail(payload: any): string | null {
 }
 
 function eventType(payload: any): string {
-  return (payload?.type || payload?.event || get(payload, ["data", "type"]) || get(payload, ["event", "type"]) || "").toString().toLowerCase();
+  return (
+    payload?.type ||
+    payload?.event ||
+    get(payload, ["data", "type"]) ||
+    get(payload, ["event", "type"]) ||
+    ""
+  )
+    .toString()
+    .toLowerCase();
 }
 
 function isActivateType(t: string): boolean {
   return (
     t === "app_payment_succeeded" ||
     // Common patterns
-    (t.includes("payment") && (t.includes("succeeded") || t.includes("success") || t.includes("completed"))) ||
-    (t.includes("purchase") && (t.includes("completed") || t.includes("succeeded"))) ||
-    (t.includes("subscription") && (t.includes("created") || t.includes("activated") || t.includes("updated") || t.includes("active"))) ||
-    (t.includes("license") && (t.includes("created") || t.includes("activated")))
+    (t.includes("payment") &&
+      (t.includes("succeeded") ||
+        t.includes("success") ||
+        t.includes("completed"))) ||
+    (t.includes("purchase") &&
+      (t.includes("completed") || t.includes("succeeded"))) ||
+    (t.includes("subscription") &&
+      (t.includes("created") ||
+        t.includes("activated") ||
+        t.includes("updated") ||
+        t.includes("active"))) ||
+    (t.includes("license") &&
+      (t.includes("created") || t.includes("activated")))
   );
 }
 
 function isCancelType(t: string): boolean {
-  return t.includes("cancel") || t.includes("expired") || t.includes("past_due") || t.includes("payment_failed") || t.includes("refund");
+  return (
+    t.includes("cancel") ||
+    t.includes("expired") ||
+    t.includes("past_due") ||
+    t.includes("payment_failed") ||
+    t.includes("refund")
+  );
 }
 
 function extractPeriodEndMs(payload: any): number | undefined {
@@ -130,9 +162,14 @@ export async function POST(req: NextRequest) {
     // Optional signature verification
     const secret = process.env.WHOP_WEBHOOK_SECRET;
     if (secret) {
-      const sig = req.headers.get("x-whop-signature") || req.headers.get("whop-signature");
+      const sig =
+        req.headers.get("x-whop-signature") ||
+        req.headers.get("whop-signature");
       if (!verifySignature(raw, sig, secret)) {
-        return NextResponse.json({ ok: false, reason: "invalid signature" }, { status: 401 });
+        return NextResponse.json(
+          { ok: false, reason: "invalid signature" },
+          { status: 401 },
+        );
       }
     }
 
@@ -153,13 +190,19 @@ export async function POST(req: NextRequest) {
         const txt = new TextDecoder().decode(raw);
         const p = new URLSearchParams(txt);
         const obj: Record<string, any> = {};
-        p.forEach((v, k) => { obj[k] = v; });
+        p.forEach((v, k) => {
+          obj[k] = v;
+        });
         body = obj;
       } catch {
         body = null;
       }
     }
-    if (!body) return NextResponse.json({ ok: false, reason: "no body" }, { status: 400 });
+    if (!body)
+      return NextResponse.json(
+        { ok: false, reason: "no body" },
+        { status: 400 },
+      );
     const email = extractEmail(body);
     // Header fallbacks for event type
     const headerType = (
@@ -170,12 +213,27 @@ export async function POST(req: NextRequest) {
       ""
     ).toLowerCase();
     const t = (eventType(body) || headerType).toLowerCase();
-    if (!email) return NextResponse.json({ ok: false, reason: "no email" }, { status: 400 });
+    if (!email)
+      return NextResponse.json(
+        { ok: false, reason: "no email" },
+        { status: 400 },
+      );
 
     const now = Date.now();
     if (process.env.DEBUG_WHOP === "1") {
-      try { console.log("[WHOP] raw:", JSON.stringify(body).slice(0, 2000)); } catch {}
-      console.log("[WHOP] event:", t, "email:", email, "plan:", body?.plan_id || get(body,["data","plan_id"]) || get(body,["plan","id"]));
+      try {
+        console.log("[WHOP] raw:", JSON.stringify(body).slice(0, 2000));
+      } catch {}
+      console.log(
+        "[WHOP] event:",
+        t,
+        "email:",
+        email,
+        "plan:",
+        body?.plan_id ||
+          get(body, ["data", "plan_id"]) ||
+          get(body, ["plan", "id"]),
+      );
     }
     if (isActivateType(t)) {
       await setEntitlement({
@@ -183,8 +241,14 @@ export async function POST(req: NextRequest) {
         status: "active",
         source: "whop",
         updatedAt: now,
-        productId: body?.product_id ?? get(body, ["data", "product_id"]) ?? get(body, ["product", "id"])?.toString(),
-        planId: body?.plan_id ?? get(body, ["data", "plan_id"]) ?? get(body, ["plan", "id"])?.toString(),
+        productId:
+          body?.product_id ??
+          get(body, ["data", "product_id"]) ??
+          get(body, ["product", "id"])?.toString(),
+        planId:
+          body?.plan_id ??
+          get(body, ["data", "plan_id"]) ??
+          get(body, ["plan", "id"])?.toString(),
         periodEnd: extractPeriodEndMs(body),
       });
       // Mark seen on success (24h)
@@ -198,8 +262,14 @@ export async function POST(req: NextRequest) {
         status: "canceled",
         source: "whop",
         updatedAt: now,
-        productId: body?.product_id ?? get(body, ["data", "product_id"]) ?? get(body, ["product", "id"])?.toString(),
-        planId: body?.plan_id ?? get(body, ["data", "plan_id"]) ?? get(body, ["plan", "id"])?.toString(),
+        productId:
+          body?.product_id ??
+          get(body, ["data", "product_id"]) ??
+          get(body, ["product", "id"])?.toString(),
+        planId:
+          body?.plan_id ??
+          get(body, ["data", "plan_id"]) ??
+          get(body, ["plan", "id"])?.toString(),
       });
       await storeSet(seenKey, "1", 24 * 3600);
       return NextResponse.json({ ok: true });
@@ -208,11 +278,17 @@ export async function POST(req: NextRequest) {
     // Ignore unknown events
     return NextResponse.json({ ok: true, ignored: true, event: t });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "webhook failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "webhook failed" },
+      { status: 500 },
+    );
   }
 }
 
 // Optional: respond to GET with a simple OK for manual checks (webhook providers will use POST)
 export async function GET() {
-  return NextResponse.json({ ok: true, message: "Whop webhook endpoint ready" });
+  return NextResponse.json({
+    ok: true,
+    message: "Whop webhook endpoint ready",
+  });
 }

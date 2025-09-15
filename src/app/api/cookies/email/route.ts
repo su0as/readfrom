@@ -7,13 +7,19 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    if (!isSameOrigin(req)) return NextResponse.json({ ok: false }, { status: 403 });
+    if (!isSameOrigin(req))
+      return NextResponse.json({ ok: false }, { status: 403 });
     const { success } = await limitByIP(req, 20, 60);
-    if (!success) return NextResponse.json({ ok: false, reason: "rate_limited" }, { status: 429 });
+    if (!success)
+      return NextResponse.json(
+        { ok: false, reason: "rate_limited" },
+        { status: 429 },
+      );
 
-    const body = await req.json().catch(() => ({} as any));
+    const body = await req.json().catch(() => ({}) as any);
     const email = (body?.email || "").toString().trim();
-    if (!/.+@.+\..+/.test(email)) return NextResponse.json({ ok: false }, { status: 400 });
+    if (!/.+@.+\..+/.test(email))
+      return NextResponse.json({ ok: false }, { status: 400 });
 
     const res = NextResponse.json({ ok: true });
     const oneYear = 365 * 24 * 3600;
@@ -26,6 +32,9 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "failed" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message || "failed" },
+      { status: 500 },
+    );
   }
 }

@@ -93,7 +93,10 @@ function PlanCard({
   return (
     <div className={`card ${highlight ? "card-popular" : ""}`}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold text-lg capitalize">{plan} {billing === "yearly" && <span className="ml-2 badge">Yearly</span>}</h3>
+        <h3 className="font-semibold text-lg capitalize">
+          {plan}{" "}
+          {billing === "yearly" && <span className="ml-2 badge">Yearly</span>}
+        </h3>
         {highlight && <span className="badge">Most popular</span>}
       </div>
       <div className="mb-1 text-3xl price">
@@ -101,7 +104,12 @@ function PlanCard({
       </div>
       {anchor && <div className="text-sm opacity-70">≈ {anchor} USD</div>}
       {savings > 0 && (
-        <div className="mt-2 inline-flex items-center gap-2 badge-sale" aria-label={`Save ${savings}%`}>Save {savings}%</div>
+        <div
+          className="mt-2 inline-flex items-center gap-2 badge-sale"
+          aria-label={`Save ${savings}%`}
+        >
+          Save {savings}%
+        </div>
       )}
 
       <ul className="mt-4 space-y-2">
@@ -126,13 +134,23 @@ function PlanCard({
           />
         )}
         {!emailValid && requireEmail && (
-          <div className="text-sm opacity-80" role="alert">Enter a valid email to continue</div>
+          <div className="text-sm opacity-80" role="alert">
+            Enter a valid email to continue
+          </div>
         )}
         <button
           className="btn"
           disabled={!configured || !emailValid}
-          title={configured ? (emailValid ? "Subscribe" : "Enter a valid email") : "Checkout not configured"}
-          onClick={() => { if (emailValid) onCheckout(plan, billing, email); }}
+          title={
+            configured
+              ? emailValid
+                ? "Subscribe"
+                : "Enter a valid email"
+              : "Checkout not configured"
+          }
+          onClick={() => {
+            if (emailValid) onCheckout(plan, billing, email);
+          }}
           aria-label={`Subscribe to ${plan} ${billing}`}
         >
           Subscribe
@@ -156,7 +174,9 @@ export default function Pricing({
   onEmailChange,
   analytics,
 }: Props) {
-  useEffect(() => { analytics?.onOpen?.(); }, [analytics]);
+  useEffect(() => {
+    analytics?.onOpen?.();
+  }, [analytics]);
   const savingsBasic = SAVINGS.basic;
   const savingsPro = SAVINGS.pro;
 
@@ -167,10 +187,18 @@ export default function Pricing({
           key={b}
           aria-pressed={billing === b}
           className="px-3 py-2"
-          onClick={() => { onBillingChange(b); analytics?.onBillingSelect?.(b); }}
+          onClick={() => {
+            onBillingChange(b);
+            analytics?.onBillingSelect?.(b);
+          }}
         >
           {b === "yearly" ? (
-            <span>Yearly <span className="opacity-80">(save {selectedPlan === "pro" ? savingsPro : savingsBasic}%)</span></span>
+            <span>
+              Yearly{" "}
+              <span className="opacity-80">
+                (save {selectedPlan === "pro" ? savingsPro : savingsBasic}%)
+              </span>
+            </span>
           ) : (
             <span>Monthly</span>
           )}
@@ -186,7 +214,10 @@ export default function Pricing({
           key={p}
           aria-pressed={selectedPlan === p}
           className="px-3 py-2 capitalize"
-          onClick={() => { onPlanChange(p); analytics?.onPlanSelect?.(p); }}
+          onClick={() => {
+            onPlanChange(p);
+            analytics?.onPlanSelect?.(p);
+          }}
         >
           {p}
         </button>
@@ -200,13 +231,22 @@ export default function Pricing({
         <h3 className="text-base font-semibold">Unlock full narration</h3>
         {PlanSwitch}
         {Toggle}
-        <PlanCard plan={selectedPlan} billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
+        <PlanCard
+          plan={selectedPlan}
+          billing={billing}
+          email={email}
+          onEmailChange={onEmailChange}
+          onCheckout={onCheckout}
+          requireEmail
+        />
         <ul className="text-sm opacity-80 list-disc ml-5">
           <li>Unlimited listening</li>
           <li>Higher-quality voices</li>
           <li>Cancel anytime</li>
         </ul>
-        <a className="text-sm underline opacity-80" href="/pricing">See all features</a>
+        <a className="text-sm underline opacity-80" href="/pricing">
+          See all features
+        </a>
       </div>
     );
   }
@@ -215,14 +255,35 @@ export default function Pricing({
   return (
     <div className="flex flex-col gap-8">
       <div className="text-center">
-        <h2 className="text-2xl md:text-4xl font-semibold">Plans to maximize your focus</h2>
-        <p className="opacity-80 mt-2">Choose monthly or save with yearly billing.</p>
-        <div className="mt-4 flex items-center justify-center gap-3">{PlanSwitch}{Toggle}</div>
+        <h2 className="text-2xl md:text-4xl font-semibold">
+          Plans to maximize your focus
+        </h2>
+        <p className="opacity-80 mt-2">
+          Choose monthly or save with yearly billing.
+        </p>
+        <div className="mt-4 flex items-center justify-center gap-3">
+          {PlanSwitch}
+          {Toggle}
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <PlanCard plan="basic" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
-        <PlanCard plan="pro" billing={billing} email={email} onEmailChange={onEmailChange} onCheckout={onCheckout} requireEmail />
+        <PlanCard
+          plan="basic"
+          billing={billing}
+          email={email}
+          onEmailChange={onEmailChange}
+          onCheckout={onCheckout}
+          requireEmail
+        />
+        <PlanCard
+          plan="pro"
+          billing={billing}
+          email={email}
+          onEmailChange={onEmailChange}
+          onCheckout={onCheckout}
+          requireEmail
+        />
       </div>
 
       {showComparison && (
@@ -248,10 +309,18 @@ export default function Pricing({
 
       {showSocialProof && (
         <div>
-          <div className="opacity-80 mb-2 text-center">Trusted by readers worldwide</div>
+          <div className="opacity-80 mb-2 text-center">
+            Trusted by readers worldwide
+          </div>
           <div className="logo-row">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card flex items-center justify-center" style={{ height: 48 }}>Logo</div>
+              <div
+                key={i}
+                className="card flex items-center justify-center"
+                style={{ height: 48 }}
+              >
+                Logo
+              </div>
             ))}
           </div>
         </div>
@@ -261,23 +330,35 @@ export default function Pricing({
         <div className="grid md:grid-cols-2 gap-4">
           <div className="card">
             <h4 className="font-semibold mb-2">Can I cancel anytime?</h4>
-            <p className="opacity-80">Yes. Subscriptions can be canceled any time; access continues until the end of the paid period.</p>
+            <p className="opacity-80">
+              Yes. Subscriptions can be canceled any time; access continues
+              until the end of the paid period.
+            </p>
           </div>
           <div className="card">
-            <h4 className="font-semibold mb-2">What’s included in the preview?</h4>
-            <p className="opacity-80">Non‑entitled users can listen to a short preview to try the voice and pacing.</p>
+            <h4 className="font-semibold mb-2">
+              What’s included in the preview?
+            </h4>
+            <p className="opacity-80">
+              Non‑entitled users can listen to a short preview to try the voice
+              and pacing.
+            </p>
           </div>
           <div className="card">
             <h4 className="font-semibold mb-2">Do you support exports?</h4>
-            <p className="opacity-80">Yes — Pro includes MP3/WAV exports and an embeddable player code.</p>
+            <p className="opacity-80">
+              Yes — Pro includes MP3/WAV exports and an embeddable player code.
+            </p>
           </div>
           <div className="card">
             <h4 className="font-semibold mb-2">Is there a refund policy?</h4>
-            <p className="opacity-80">We keep it simple: if something goes wrong, reach out and we’ll make it right.</p>
+            <p className="opacity-80">
+              We keep it simple: if something goes wrong, reach out and we’ll
+              make it right.
+            </p>
           </div>
         </div>
       )}
     </div>
   );
 }
-

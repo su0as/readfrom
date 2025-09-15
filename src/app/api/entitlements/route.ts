@@ -17,7 +17,14 @@ export async function GET(req: NextRequest) {
     if (!success) {
       return NextResponse.json(
         { error: "Rate limit exceeded" },
-        { status: 429, headers: { "X-RateLimit-Limit": "120", "X-RateLimit-Remaining": String(remaining), "X-RateLimit-Reset": String(reset) } }
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": "120",
+            "X-RateLimit-Remaining": String(remaining),
+            "X-RateLimit-Reset": String(reset),
+          },
+        },
       );
     }
 
@@ -30,8 +37,15 @@ export async function GET(req: NextRequest) {
     if (process.env.DEBUG_WHOP === "1") {
       console.log("[ENTL] lookup", email, { entitled, ent });
     }
-    return NextResponse.json({ email, entitled, entitlement: ent || undefined });
+    return NextResponse.json({
+      email,
+      entitled,
+      entitlement: ent || undefined,
+    });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Failed" },
+      { status: 500 },
+    );
   }
 }
