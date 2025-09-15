@@ -16,7 +16,10 @@ const LOCALE_TO_CURRENCY: Array<[RegExp, string]> = [
   [/en-CA|fr-CA/i, "CAD"],
   [/en-AU/i, "AUD"],
   [/en-IN|hi-IN/i, "INR"],
-  [/de-DE|fr-FR|es-ES|it-IT|nl-NL|pt-PT|fi-FI|el-GR|sk-SK|sl-SI|et-EE|lv-LV|lt-LT|ga-IE/i, "EUR"],
+  [
+    /de-DE|fr-FR|es-ES|it-IT|nl-NL|pt-PT|fi-FI|el-GR|sk-SK|sl-SI|et-EE|lv-LV|lt-LT|ga-IE/i,
+    "EUR",
+  ],
   [/es-MX/i, "MXN"],
   [/pt-BR/i, "BRL"],
   [/ja-JP/i, "JPY"],
@@ -54,27 +57,39 @@ export async function getUsdRates(): Promise<UsdRates> {
     const raw = localStorage.getItem(FX_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as UsdRates;
-      if (parsed && parsed.fetchedAt && Date.now() - parsed.fetchedAt < FX_TTL) {
+      if (
+        parsed &&
+        parsed.fetchedAt &&
+        Date.now() - parsed.fetchedAt < FX_TTL
+      ) {
         return parsed;
       }
     }
   } catch {}
 
   try {
-    const res = await fetch("https://api.exchangerate.host/latest?base=USD", { cache: "no-store" });
+    const res = await fetch("https://api.exchangerate.host/latest?base=USD", {
+      cache: "no-store",
+    });
     if (!res.ok) throw new Error(String(res.status));
     const data = (await res.json()) as { rates?: Record<string, number> };
     const bundle: UsdRates = { rates: data.rates || {}, fetchedAt: Date.now() };
-    try { localStorage.setItem(FX_KEY, JSON.stringify(bundle)); } catch {}
+    try {
+      localStorage.setItem(FX_KEY, JSON.stringify(bundle));
+    } catch {}
     return bundle;
   } catch {
     return { rates: {}, fetchedAt: 0 };
   }
 }
 
-export async function convertUsd(amountUsd: number, targetCode?: string): Promise<{ localAmount: number; localCode: string; hasRate: boolean }>{
+export async function convertUsd(
+  amountUsd: number,
+  targetCode?: string,
+): Promise<{ localAmount: number; localCode: string; hasRate: boolean }> {
   const code = targetCode || detectCurrencyCode();
-  if (code === "USD") return { localAmount: amountUsd, localCode: "USD", hasRate: true };
+  if (code === "USD")
+    return { localAmount: amountUsd, localCode: "USD", hasRate: true };
   const { rates } = await getUsdRates();
   const rate = rates[code];
   if (!rate || !isFinite(rate)) {
@@ -83,13 +98,21 @@ export async function convertUsd(amountUsd: number, targetCode?: string): Promis
   return { localAmount: amountUsd * rate, localCode: code, hasRate: true };
 }
 
-export function formatCurrency(amount: number, code: string, locale?: string): string {
+export function formatCurrency(
+  amount: number,
+  code: string,
+  locale?: string,
+): string {
   try {
-    return new Intl.NumberFormat(locale || (typeof navigator !== "undefined" ? navigator.language : "en-US"), {
-      style: "currency",
-      currency: code,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return new Intl.NumberFormat(
+      locale ||
+        (typeof navigator !== "undefined" ? navigator.language : "en-US"),
+      {
+        style: "currency",
+        currency: code,
+        maximumFractionDigits: 2,
+      },
+    ).format(amount);
   } catch {
     // Fallback naive formatting
     const sym = code === "USD" ? "$" : "";
@@ -97,7 +120,10 @@ export function formatCurrency(amount: number, code: string, locale?: string): s
   }
 }
 
-export async function formatUsdAndLocal(amountUsd: number, targetCode?: string): Promise<{ local: string; usd: string; localCode: string }>{
+export async function formatUsdAndLocal(
+  amountUsd: number,
+  targetCode?: string,
+): Promise<{ local: string; usd: string; localCode: string }> {
   const { localAmount, localCode } = await convertUsd(amountUsd, targetCode);
   const local = formatCurrency(localAmount, localCode);
   const usd = formatCurrency(amountUsd, "USD");
@@ -107,7 +133,9 @@ export async function formatUsdAndLocal(amountUsd: number, targetCode?: string):
 // Optional helper hook for components
 import { useEffect, useMemo, useState } from "react";
 export function useUsdToLocal() {
-  const [code] = useState<string>(() => (typeof window !== "undefined" ? detectCurrencyCode() : "USD"));
+  const [code] = useState<string>(() =>
+    typeof window !== "undefined" ? detectCurrencyCode() : "USD",
+  );
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,24 +148,31 @@ export function useUsdToLocal() {
         if (!mounted) return;
         setRates(fx.rates || {});
       } catch (e: unknown) {
-        if (!mounted) return; setError(e instanceof Error ? e.message : "fx failed");
+        if (!mounted) return;
+        setError(e instanceof Error ? e.message : "fx failed");
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const format = useMemo(() => (amountUsd: number, forceCode?: string) => {
-    const c = forceCode || code;
-    if (c === "USD") return { primary: formatCurrency(amountUsd, "USD"), anchor: "" };
-    const rate = rates[c];
-    if (!rate || !isFinite(rate)) return { primary: formatCurrency(amountUsd, "USD"), anchor: "" };
-    const local = formatCurrency(amountUsd * rate, c);
-    const anchor = formatCurrency(amountUsd, "USD");
-    return { primary: local, anchor };
-  }, [code, rates]);
+  const format = useMemo(
+    () => (amountUsd: number, forceCode?: string) => {
+      const c = forceCode || code;
+      if (c === "USD")
+        return { primary: formatCurrency(amountUsd, "USD"), anchor: "" };
+      const rate = rates[c];
+      if (!rate || !isFinite(rate))
+        return { primary: formatCurrency(amountUsd, "USD"), anchor: "" };
+      const local = formatCurrency(amountUsd * rate, c);
+      const anchor = formatCurrency(amountUsd, "USD");
+      return { primary: local, anchor };
+    },
+    [code, rates],
+  );
 
   return { code, loading, error, format } as const;
 }
-

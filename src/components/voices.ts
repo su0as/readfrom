@@ -8,4 +8,3 @@ export const VOICES = [
   { id: "en-GB-Chirp3-HD-Schedar", label: "UK • Schedar (M)" },
   { id: "en-GB-Chirp3-HD-Zephyr", label: "UK • Zephyr (F)" },
 ] as const;
-

@@ -30,8 +30,12 @@ export default function PricingModal({
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
   // Keep state in sync if props change while open
-  useEffect(() => { if (open) setPlan(initialPlan); }, [open, initialPlan]);
-  useEffect(() => { if (open) setBilling(initialBilling); }, [open, initialBilling]);
+  useEffect(() => {
+    if (open) setPlan(initialPlan);
+  }, [open, initialPlan]);
+  useEffect(() => {
+    if (open) setBilling(initialBilling);
+  }, [open, initialBilling]);
 
   // Focus trap
   useEffect(() => {
@@ -39,11 +43,20 @@ export default function PricingModal({
     lastActive.current = (document.activeElement as HTMLElement) || null;
     const el = dialogRef.current;
     if (!el) return;
-    const focusables = () => Array.from(el.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+    const focusables = () =>
+      Array.from(
+        el.querySelectorAll<HTMLElement>(
+          "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])",
+        ),
+      );
     const first = focusables()[0];
     first?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
       if (e.key === "Tab") {
         const list = focusables();
         if (!list.length) return;
@@ -64,7 +77,15 @@ export default function PricingModal({
   if (typeof document === "undefined" || !open) return null;
 
   const body = (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={onClose}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        zIndex: 100,
+      }}
+      onClick={onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -87,10 +108,20 @@ export default function PricingModal({
       >
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h2 id="pricing-title" className="text-xl font-semibold">{context === "play" ? "Preview playing… Unlock full narration" : "Choose a plan"}</h2>
-            {context === "preview-expired" && <p className="opacity-80">Your preview ended. Continue listening with a subscription.</p>}
+            <h2 id="pricing-title" className="text-xl font-semibold">
+              {context === "play"
+                ? "Preview playing… Unlock full narration"
+                : "Choose a plan"}
+            </h2>
+            {context === "preview-expired" && (
+              <p className="opacity-80">
+                Your preview ended. Continue listening with a subscription.
+              </p>
+            )}
           </div>
-          <button className="btn" aria-label="Close pricing" onClick={onClose}>Close</button>
+          <button className="btn" aria-label="Close pricing" onClick={onClose}>
+            Close
+          </button>
         </div>
 
         <Pricing
@@ -111,4 +142,3 @@ export default function PricingModal({
 
   return ReactDOM.createPortal(body, document.body);
 }
-

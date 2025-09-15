@@ -12,7 +12,8 @@ export function isSameOrigin(req: NextRequest): boolean {
 }
 
 export function getSiteOrigin(req?: NextRequest): string {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  if (process.env.NEXT_PUBLIC_SITE_URL)
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   if (req) return `${req.nextUrl.protocol}//${req.nextUrl.host}`;
   return "";
 }

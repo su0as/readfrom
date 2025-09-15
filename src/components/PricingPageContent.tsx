@@ -20,21 +20,52 @@ const SAVE = {
   pro: yearlySavingsPct(PRICES.pro.monthly, PRICES.pro.yearly),
 };
 
-function CardEmailCTA({ initial, onChange, onCheckout }: { initial: string; onChange?: (v: string) => void; onCheckout: (email: string) => void }) {
+function CardEmailCTA({
+  initial,
+  onChange,
+  onCheckout,
+}: {
+  initial: string;
+  onChange?: (v: string) => void;
+  onCheckout: (email: string) => void;
+}) {
   const ref = React.useRef<HTMLInputElement | null>(null);
   const [msg, setMsg] = React.useState<string>("");
   const tryCheckout = () => {
     const em = (ref.current?.value || "").trim();
-    if (!/.+@.+\..+/.test(em)) { setMsg("Enter a valid email"); return; }
+    if (!/.+@.+\..+/.test(em)) {
+      setMsg("Enter a valid email");
+      return;
+    }
     setMsg("");
     onChange?.(em);
     onCheckout(em);
   };
   return (
     <div className="mt-4 space-y-2">
-      <input ref={ref} className="btn-input" type="email" name="email" inputMode="email" autoComplete="email" placeholder="you@example.com" defaultValue={initial} aria-label="Your email" />
-      {msg && <div className="text-sm opacity-80" role="alert">{msg}</div>}
-      <button type="button" className="btn btn-primary w-full" onClick={tryCheckout}>Subscribe</button>
+      <input
+        ref={ref}
+        className="btn-input"
+        type="email"
+        name="email"
+        inputMode="email"
+        autoComplete="email"
+        placeholder="you@example.com"
+        defaultValue={initial}
+        aria-label="Your email"
+      />
+      {msg && (
+        <div className="text-sm opacity-80" role="alert">
+          {msg}
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn btn-primary w-full"
+        onClick={tryCheckout}
+      >
+        Subscribe
+      </button>
     </div>
   );
 }
@@ -50,22 +81,38 @@ export default function PricingPageContent({
   onBillingChange: (b: Billing) => void;
   email: string;
   onEmailChange: (v: string) => void;
-  onCheckout: (p: Exclude<keyof typeof PRICES, 'free'> extends Plan ? Plan : Plan, b: Billing, email: string) => void;
+  onCheckout: (
+    p: Exclude<keyof typeof PRICES, "free"> extends Plan ? Plan : Plan,
+    b: Billing,
+    email: string,
+  ) => void;
 }) {
   const { format } = useUsdToLocal();
 
-  const Card = ({ plan, highlight, description }: { plan: 'free' | 'basic' | 'pro'; highlight?: boolean; description: string }) => {
-    const usd = PRICES[plan][billing as 'monthly' | 'yearly'] ?? 0;
+  const Card = ({
+    plan,
+    highlight,
+    description,
+  }: {
+    plan: "free" | "basic" | "pro";
+    highlight?: boolean;
+    description: string;
+  }) => {
+    const usd = PRICES[plan][billing as "monthly" | "yearly"] ?? 0;
     const { primary, anchor } = format(usd);
-    const savings = plan !== 'free' && billing === 'yearly' ? SAVE[plan as 'basic' | 'pro'] : 0;
-    const features = plan === 'free'
-      ? ["30s preview per read", "Word highlighting"]
-      : plan === 'basic'
-      ? ["Natural voices", "Word highlighting", "Multiple themes"]
-      : ["Everything in Basic", "Export MP3/WAV", "Embed code"];
+    const savings =
+      plan !== "free" && billing === "yearly"
+        ? SAVE[plan as "basic" | "pro"]
+        : 0;
+    const features =
+      plan === "free"
+        ? ["30s preview per read", "Word highlighting"]
+        : plan === "basic"
+          ? ["Natural voices", "Word highlighting", "Multiple themes"]
+          : ["Everything in Basic", "Export MP3/WAV", "Embed code"];
 
     return (
-      <div className={`card ${highlight ? 'card-popular' : ''}`}>
+      <div className={`card ${highlight ? "card-popular" : ""}`}>
         <div className="mb-2">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold capitalize">{plan}</h3>
@@ -76,18 +123,30 @@ export default function PricingPageContent({
 
         <div className="space-y-2">
           <div className="text-3xl price">{primary}</div>
-          {anchor && usd > 0 && <div className="text-sm opacity-70">≈ {anchor} USD</div>}
+          {anchor && usd > 0 && (
+            <div className="text-sm opacity-70">≈ {anchor} USD</div>
+          )}
           {savings > 0 && <div className="badge-sale">Save {savings}%</div>}
           <ul className="text-sm opacity-90 mt-2 list-disc ml-5">
-            {features.map((f) => (<li key={f}>{f}</li>))}
+            {features.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
           </ul>
         </div>
 
-        {plan !== 'free' ? (
-          <CardEmailCTA onCheckout={(em) => onCheckout(plan as 'basic' | 'pro', billing, em)} onChange={onEmailChange} initial={email} />
+        {plan !== "free" ? (
+          <CardEmailCTA
+            onCheckout={(em) =>
+              onCheckout(plan as "basic" | "pro", billing, em)
+            }
+            onChange={onEmailChange}
+            initial={email}
+          />
         ) : (
           <div className="mt-4">
-            <Link href="/" className="btn w-full">Get Started</Link>
+            <Link href="/" className="btn w-full">
+              Get Started
+            </Link>
           </div>
         )}
       </div>
@@ -97,13 +156,29 @@ export default function PricingPageContent({
   return (
     <div className="flex flex-col gap-8">
       <div className="text-center">
-        <h2 className="text-2xl md:text-4xl font-semibold">Plans to maximize your focus</h2>
-        <p className="opacity-80 mt-2">Choose monthly or save with yearly billing.</p>
+        <h2 className="text-2xl md:text-4xl font-semibold">
+          Plans to maximize your focus
+        </h2>
+        <p className="opacity-80 mt-2">
+          Choose monthly or save with yearly billing.
+        </p>
         <div className="mt-4 flex items-center justify-center gap-3">
           <div className="toggle" aria-label="Billing">
             {(["monthly", "yearly"] as Billing[]).map((b) => (
-              <button key={b} aria-pressed={billing === b} className="px-3 py-2" onClick={() => onBillingChange(b)}>
-                {b === "yearly" ? <>Yearly <span className="opacity-80">(save {SAVE.pro}%)</span></> : "Monthly"}
+              <button
+                key={b}
+                aria-pressed={billing === b}
+                className="px-3 py-2"
+                onClick={() => onBillingChange(b)}
+              >
+                {b === "yearly" ? (
+                  <>
+                    Yearly{" "}
+                    <span className="opacity-80">(save {SAVE.pro}%)</span>
+                  </>
+                ) : (
+                  "Monthly"
+                )}
               </button>
             ))}
           </div>
@@ -111,16 +186,30 @@ export default function PricingPageContent({
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <Card plan="free" description="Try the experience with a short preview." />
+        <Card
+          plan="free"
+          description="Try the experience with a short preview."
+        />
         <Card plan="basic" description="For casual listening and focus." />
-        <Card plan="pro" highlight description="For creators needing exports and embeds." />
+        <Card
+          plan="pro"
+          highlight
+          description="For creators needing exports and embeds."
+        />
       </div>
 
       <div className="text-center opacity-80">Trusted by readers worldwide</div>
       <div className="logo-row">
-        {Array.from({ length: 6 }).map((_, i) => (<div key={i} className="card flex items-center justify-center" style={{ height: 48 }}>Logo</div>))}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="card flex items-center justify-center"
+            style={{ height: 48 }}
+          >
+            Logo
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-

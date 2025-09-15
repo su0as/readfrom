@@ -6,4 +6,3 @@ if (process.env.SENTRY_DSN) {
     tracesSampleRate: 0.1,
   });
 }
-
