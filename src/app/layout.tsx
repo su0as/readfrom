@@ -105,11 +105,6 @@ export default function RootLayout({
               to
             </span>
           </Link>
-          <nav style={{ marginLeft: "auto" }}>
-            <Link href="/pricing" className="btn" style={{ marginLeft: 8 }}>
-              Pricing
-            </Link>
-          </nav>
         </header>
         {children}
         <Analytics />
