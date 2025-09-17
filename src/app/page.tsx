@@ -6,6 +6,7 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { VOICES } from "@/components/voices";
 // import Pricing from "@/components/Pricing";
 import PricingModal from "@/components/PricingModal";
@@ -1311,6 +1312,11 @@ export default function Home() {
       >
         <div className="p-4 flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Controls</h2>
+          <div className="flex items-center gap-2">
+            <Link href="/pricing" className="btn">
+              Pricing
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <button className="btn" onClick={togglePlay}>
               {isPlaying ? "Pause" : "Play"}
