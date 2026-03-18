@@ -1,41 +1,22 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import Pricing from "@/components/Pricing";
-import { Billing, Plan } from "@/utils/checkout";
 
 export default function PricingModal({
   open,
-  initialPlan = "pro",
-  initialBilling = "yearly",
   email,
-  onEmailChange,
   onClose,
-  onCheckout,
   context = "generic",
 }: {
   open: boolean;
-  initialPlan?: Plan;
-  initialBilling?: Billing;
   email?: string;
-  onEmailChange?: (email: string) => void;
   onClose: () => void;
-  onCheckout: (plan: Plan, billing: Billing, email?: string) => void;
   context?: "play" | "preview-expired" | "sidebar" | "generic";
 }) {
-  const [plan, setPlan] = useState<Plan>(initialPlan);
-  const [billing, setBilling] = useState<Billing>(initialBilling);
   const lastActive = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-
-  // Keep state in sync if props change while open
-  useEffect(() => {
-    if (open) setPlan(initialPlan);
-  }, [open, initialPlan]);
-  useEffect(() => {
-    if (open) setBilling(initialBilling);
-  }, [open, initialBilling]);
 
   // Focus trap
   useEffect(() => {
@@ -100,7 +81,7 @@ export default function PricingModal({
           position: "absolute",
           inset: "10% 50% auto 50%",
           transform: "translateX(-50%)",
-          width: "min(920px, 90vw)",
+          width: "min(960px, 90vw)",
           maxHeight: "80vh",
           overflowY: "auto",
           padding: 16,
@@ -110,7 +91,7 @@ export default function PricingModal({
           <div>
             <h2 id="pricing-title" className="text-xl font-semibold">
               {context === "play"
-                ? "Preview playing… Unlock full narration"
+                ? "Preview playing\u2026 Unlock full narration"
                 : "Choose a plan"}
             </h2>
             {context === "preview-expired" && (
@@ -124,18 +105,7 @@ export default function PricingModal({
           </button>
         </div>
 
-        <Pricing
-          selectedPlan={plan}
-          billing={billing}
-          onPlanChange={setPlan}
-          onBillingChange={setBilling}
-          onCheckout={onCheckout}
-          email={email}
-          onEmailChange={onEmailChange}
-          showComparison
-          showFAQ
-          showSocialProof
-        />
+        <Pricing email={email} onClose={onClose} />
       </div>
     </div>
   );

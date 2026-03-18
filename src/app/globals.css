@@ -1,36 +1,40 @@
 @import "tailwindcss";
 
-/* Theme tokens */
+/* ─── Fonts ─────────────────────────────────────────────────────────────────── */
 :root {
   --font-spectral: "Spectral", serif;
+  --font-ui: "Inter", "DM Sans", system-ui, sans-serif;
+}
 
+/* ─── Theme tokens ───────────────────────────────────────────────────────────── */
+:root {
   --bg: #ffffff;
   --fg: #111111;
-  --muted: #6b7280; /* gray-500 */
-  --dim: #c7c7c7; /* for future text in focus mode */
+  --muted: #6b7280;
+  --dim: #c7c7c7;
   --accent: #111111;
   --accentAlpha: color-mix(in oklab, var(--fg) 12%, transparent);
   --accentFg: #ffffff;
   --border: #e5e7eb;
   --surface: #ffffff;
   --borderStrong: #d1d5db;
-  --highlight-current-bg: #ffe066; /* yellow highlight */
-  --highlight-read-fg: #9ca3af; /* gray-400 */
+  --highlight-current-bg: #fef08a; /* soft yellow */
+  --highlight-read-fg: #9ca3af;
 }
 
 html.theme-dark {
-  --bg: #121212;
-  --fg: #f5f5f5;
+  --bg: #0a0a0a;
+  --fg: #e5e5e5;
   --muted: #9ca3af;
-  --dim: #404040;
-  --accent: #f5f5f5;
+  --dim: #333333;
+  --accent: #e5e5e5;
   --accentAlpha: color-mix(in oklab, var(--fg) 16%, transparent);
-  --accentFg: #111111;
-  --border: #262626;
-  --surface: #1a1a1a;
-  --borderStrong: #3a3a3a;
-  --highlight-current-bg: #f59e0b; /* amber-500 */
-  --highlight-read-fg: #737373;
+  --accentFg: #0a0a0a;
+  --border: #222222;
+  --surface: #141414;
+  --borderStrong: #333333;
+  --highlight-current-bg: #d97706;
+  --highlight-read-fg: #555555;
 }
 
 html.theme-beige {
@@ -48,45 +52,419 @@ html.theme-beige {
   --highlight-read-fg: #9b968a;
 }
 
+/* ─── Base ──────────────────────────────────────────────────────────────────── */
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-spectral), serif;
 }
 
-/* Reader tokens */
+/* ─── Reader tokens ─────────────────────────────────────────────────────────── */
 .token {
   transition:
     background-color 120ms ease,
     color 120ms ease;
+  border-radius: 3px;
 }
-/* Past words (read) and current word use normal foreground */
 .token-read {
   color: var(--fg);
 }
 .token-current {
-  background: transparent;
+  background: var(--highlight-current-bg);
   color: var(--fg);
+  border-radius: 3px;
+  /* subtle animated underline */
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--fg) 30%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
-/* Future words dimmed */
 .token-dim {
   color: var(--dim);
 }
-/* When smooth fade toggle is on, opacity changes are animated inline via style; nothing else needed */
 
-/* Utility */
+/* ─── Layout ────────────────────────────────────────────────────────────────── */
+.reader-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px 120px; /* bottom padding for playback bar */
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .reader-content {
+    padding: 16px 16px 100px;
+  }
+}
+
+/* ─── Top Bar ───────────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .topbar-center {
+    display: none;
+  }
+}
+
+/* Mobile top bar: only logo, play, menu */
+.topbar-mobile-controls {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .topbar-mobile-controls {
+    display: flex;
+  }
+  .topbar-right {
+    display: none;
+  }
+}
+
+/* ─── Play Button ───────────────────────────────────────────────────────────── */
+.play-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fg);
+  color: var(--accentFg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+.play-btn:hover {
+  opacity: 0.85;
+  transform: scale(1.04);
+}
+.play-btn:active {
+  transform: scale(0.96);
+}
+.play-btn:focus-visible {
+  outline: 3px solid var(--accentAlpha);
+  outline-offset: 3px;
+}
+
+/* ─── Speed Segment ─────────────────────────────────────────────────────────── */
+.speed-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  font-family: var(--font-ui);
+}
+.speed-seg button {
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  min-height: 36px;
+  min-width: 44px;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.speed-seg button:hover {
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  color: var(--fg);
+}
+.speed-seg button[aria-pressed="true"] {
+  background: var(--fg);
+  color: var(--accentFg);
+}
+
+/* ─── Bottom Playback Bar ───────────────────────────────────────────────────── */
+.playback-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  z-index: 30;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  padding: 10px 16px 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.playback-bar.visible {
+  transform: translateY(0);
+}
+.playback-bar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-family: var(--font-ui);
+}
+.playback-progress {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+}
+.playback-progress:hover {
+  height: 6px;
+}
+.playback-progress-fill {
+  height: 100%;
+  background: var(--fg);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+.playback-time {
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.pb-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  min-height: 36px;
+  min-width: 36px;
+}
+.pb-btn:hover {
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.pb-play-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fg);
+  color: var(--accentFg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pb-play-btn:hover {
+  opacity: 0.85;
+}
+
+/* ─── Upgrade Banner ────────────────────────────────────────────────────────── */
+.upgrade-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 2px solid var(--borderStrong);
+  z-index: 40;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.upgrade-banner.visible {
+  transform: translateY(0);
+}
+.upgrade-banner-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 20px 32px;
+}
+.upgrade-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .upgrade-plan-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.upgrade-plan-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--bg);
+  position: relative;
+}
+.upgrade-plan-card.popular {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 1px var(--fg);
+}
+.upgrade-plan-card.best-value {
+  border-color: color-mix(in oklab, var(--fg) 50%, transparent);
+}
+.plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--accentFg);
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+/* ─── URL Input row ─────────────────────────────────────────────────────────── */
+.url-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.url-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  outline: none;
+  min-height: 40px;
+}
+.url-row input:focus {
+  border-color: var(--borderStrong);
+  outline: none;
+}
+.url-row input::placeholder {
+  color: var(--muted);
+}
+
+/* ─── Sample Cards ──────────────────────────────────────────────────────────── */
+.samples-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+@media (max-width: 640px) {
+  .samples-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.sample-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  text-align: left;
+}
+.sample-card:hover {
+  background: color-mix(in oklab, var(--fg) 4%, var(--bg));
+  border-color: var(--borderStrong);
+  transform: translateY(-1px);
+}
+.sample-card:active {
+  transform: translateY(0);
+}
+.sample-card-label {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.sample-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.sample-card-preview {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sample-play-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: var(--muted);
+}
+
+/* ─── Utility ───────────────────────────────────────────────────────────────── */
 .container {
   max-width: 80ch;
   margin: 0 auto;
 }
 
-/* Controls */
 .btn {
   @apply px-3 py-2 rounded border;
   border-color: var(--border);
   cursor: pointer;
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 36px;
+  min-width: 36px;
+  font-family: var(--font-ui);
+  font-size: 14px;
 }
 .btn:hover {
   background: color-mix(in oklab, var(--fg) 8%, var(--bg));
@@ -95,13 +473,13 @@ body {
   outline: 2px solid color-mix(in oklab, var(--fg) 20%, transparent);
   outline-offset: 2px;
 }
-/* Input variant to ensure consistent typing behavior */
 .btn-input {
   @apply px-3 py-2 rounded border;
   border-color: var(--border);
   background: var(--bg);
   width: 100%;
   min-height: 44px;
+  font-family: var(--font-ui);
 }
 .btn-input:focus {
   outline: 2px solid color-mix(in oklab, var(--fg) 20%, transparent);
@@ -109,28 +487,21 @@ body {
 }
 .btn-primary {
   border-color: transparent;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--fg) 14%, var(--bg)),
-    color-mix(in oklab, var(--fg) 22%, var(--bg))
-  );
+  background: var(--fg);
   color: var(--accentFg);
+  font-family: var(--font-ui);
 }
 .btn-primary:hover {
-  filter: brightness(1.05);
-}
-/* Theme-specific primary emphasis: white/beige => black button; dark => beige button */
-html:not(.theme-dark):not(.theme-beige) .btn-primary {
-  background: #111111;
-  color: #ffffff;
-}
-html.theme-beige .btn-primary {
-  background: #111111;
-  color: #ffffff;
+  opacity: 0.88;
 }
 html.theme-dark .btn-primary {
   background: #f5f1e6;
   color: #1f2937;
+}
+.btn-sm {
+  font-size: 13px;
+  padding: 4px 10px;
+  min-height: 30px;
 }
 .badge {
   display: inline-block;
@@ -140,12 +511,13 @@ html.theme-dark .btn-primary {
   border: 1px solid var(--border);
   color: var(--fg);
   opacity: 0.8;
+  font-family: var(--font-ui);
 }
 .updated {
   background: color-mix(in oklab, var(--fg) 6%, var(--bg));
 }
 
-/* Logo colors */
+/* ─── Logo ──────────────────────────────────────────────────────────────────── */
 .logo .read {
   color: #111111;
 }
@@ -153,13 +525,13 @@ html.theme-dark .btn-primary {
   color: #9ca3af;
 }
 html.theme-dark .logo .read {
-  color: #f5f5f5;
+  color: #e5e5e5;
 }
 html.theme-dark .logo .to {
   color: #9ca3af;
 }
 
-/* Pricing cards */
+/* ─── Pricing cards (existing) ──────────────────────────────────────────────── */
 .card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -186,12 +558,14 @@ html.theme-dark .logo .to {
   background: var(--accentAlpha);
   color: var(--fg);
   font-size: 12px;
+  font-family: var(--font-ui);
 }
 .toggle {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 9999px;
   overflow: hidden;
+  font-family: var(--font-ui);
 }
 .toggle > button[aria-pressed="true"] {
   background: var(--accent);
@@ -208,18 +582,120 @@ input[type="range"] {
   color: inherit;
 }
 
-/* Editor */
+/* ─── Editor ────────────────────────────────────────────────────────────────── */
 .editor {
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
   min-height: 40vh;
+  line-height: 1.8;
 }
 .editor.placeholder {
   color: var(--muted);
 }
 
-/* Sidebar */
+/* ─── Top loading bar ───────────────────────────────────────────────────────── */
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: transparent;
+  z-index: 60;
+}
+.progress .bar {
+  height: 100%;
+  width: 0;
+  background: var(--fg);
+  transition: width 0.2s ease;
+}
+.progress.active .bar {
+  animation: none;
+}
+
+/* ─── Toast / notification ──────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--fg);
+  color: var(--accentFg);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  z-index: 80;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Reader text sizing ────────────────────────────────────────────────────── */
+.reader-sm {
+  font-size: 18px;
+  line-height: 1.8;
+}
+.reader-md {
+  font-size: clamp(18px, 4vw, 26px);
+  line-height: 1.8;
+}
+.reader-lg {
+  font-size: clamp(22px, 5vw, 34px);
+  line-height: 1.8;
+}
+
+/* ─── Mobile drawer for controls ───────────────────────────────────────────── */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  z-index: 50;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+  padding: 16px;
+}
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+.mobile-drawer-overlay {
+  display: none;
+}
+.mobile-drawer.open ~ .mobile-drawer-overlay,
+.mobile-drawer-overlay.visible {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 49;
+}
+
+/* ─── Keyboard shortcut tooltip ─────────────────────────────────────────────── */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in oklab, var(--fg) 8%, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ─── Sidebar (legacy, kept for pricing etc.) ───────────────────────────────── */
 .sidebar {
   position: fixed;
   top: 0;
@@ -236,32 +712,9 @@ input[type="range"] {
 .sidebar.open {
   transform: translateX(0);
 }
-.sidebar-toggle {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 50;
-  font-size: 12px;
-  padding: 4px 8px;
-}
 
-/* Top loading bar */
-.progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 3px;
-  width: 100%;
-  background: transparent;
-  z-index: 60;
-}
-.progress .bar {
-  height: 100%;
-  width: 0;
-  background: var(--fg);
-  transition: width 0.2s ease;
-}
-/* Determinate mode: rely on inline width for left-to-right fill */
-.progress.active .bar {
-  animation: none;
+/* ─── Walkthrough tour animation ─────────────────────────────────────────── */
+@keyframes wt-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

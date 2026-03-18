@@ -1,43 +1,47 @@
 /* Client-side checkout helpers and plan/billing types. */
 "use client";
 
+// Legacy plan types used by existing Pricing components
 export type Plan = "basic" | "pro";
 export type Billing = "monthly" | "yearly";
 
-// Optional hardcoded fallbacks (used if env vars are missing)
-// These can be overwritten by setting NEXT_PUBLIC_WHOP_CHECKOUT_URL_* env vars.
-const FALLBACK_LINKS: Partial<
-  Record<
-    "BASIC_MONTHLY" | "BASIC_YEARLY" | "PRO_MONTHLY" | "PRO_YEARLY",
-    string
-  >
-> = {
-  BASIC_MONTHLY: "https://whop.com/checkout/plan_WuQ9oNNUPtoqW?d2c=true",
-  BASIC_YEARLY: "https://whop.com/checkout/plan_UREUrsMIXAO1N?d2c=true",
-  PRO_MONTHLY: "https://whop.com/checkout/plan_o9jbTY2jmGRo8?d2c=true",
-  PRO_YEARLY: "https://whop.com/checkout/plan_DWncFUzXGw4Cc?d2c=true",
+// New subscription tiers (Weekly / Monthly / Yearly)
+export type SubscriptionPlan = "weekly" | "monthly" | "yearly";
+
+// Real Whop plan URLs (single tier — Premium, three billing frequencies)
+const SUBSCRIPTION_LINKS = {
+  WEEKLY: "https://whop.com/checkout/plan_Gf6WFmHaNBTuE",
+  MONTHLY: "https://whop.com/checkout/plan_WUq3nLCuW4EXU",
+  YEARLY: "https://whop.com/checkout/plan_NQBXU8gJkERiA",
+} as const;
+
+// Legacy fallback links — map old basic/pro to the real plans
+const FALLBACK_LINKS: Record<string, string> = {
+  BASIC_MONTHLY: SUBSCRIPTION_LINKS.MONTHLY,
+  BASIC_YEARLY: SUBSCRIPTION_LINKS.YEARLY,
+  PRO_MONTHLY: SUBSCRIPTION_LINKS.MONTHLY,
+  PRO_YEARLY: SUBSCRIPTION_LINKS.YEARLY,
 };
 
 function env(name: string): string | undefined {
-  // process.env.* is inlined by Next.js for NEXT_PUBLIC_ variables
   const val = (process.env as Record<string, string | undefined>)[name];
   if (val) return val;
-  // If a direct env is missing, return a fallback when the name matches our pattern
   const m = name.match(
-    /^NEXT_PUBLIC_WHOP_CHECKOUT_URL_(BASIC|PRO)_(MONTHLY|YEARLY)$/,
+    /^NEXT_PUBLIC_WHOP_CHECKOUT_URL_(WEEKLY|MONTHLY|YEARLY|(?:BASIC|PRO)_(?:MONTHLY|YEARLY))$/,
   );
   if (m) {
-    const key = `${m[1]}_${m[2]}` as keyof typeof FALLBACK_LINKS;
+    const key = m[1] as keyof typeof FALLBACK_LINKS;
     return FALLBACK_LINKS[key];
   }
   return undefined;
 }
 
+// Legacy: plan + billing → checkout URL
 function byPlanBilling(
   plan: Plan,
   billing: Billing,
 ): (name: string) => string | undefined {
-  const key = `${plan.toUpperCase()}_${billing.toUpperCase()}`; // e.g., BASIC_MONTHLY
+  const key = `${plan.toUpperCase()}_${billing.toUpperCase()}`;
   return (name: string) => env(`NEXT_PUBLIC_${name}_${key}`);
 }
 
@@ -45,27 +49,35 @@ export function getCheckoutBaseUrl(
   plan: Plan,
   billing: Billing,
 ): string | null {
-  // Tier-specific url
   const tier =
     byPlanBilling(plan, billing)("WHOP_CHECKOUT_URL") ||
     env(
       `NEXT_PUBLIC_WHOP_CHECKOUT_URL_${plan.toUpperCase()}_${billing.toUpperCase()}`,
     );
   if (tier) return tier;
-  // Generic monthly/yearly fallbacks
   const genericByBilling = env(
     `NEXT_PUBLIC_WHOP_CHECKOUT_URL_${billing.toUpperCase()}`,
   );
   if (genericByBilling) return genericByBilling;
-  // Single generic fallback
   const any = env("NEXT_PUBLIC_WHOP_CHECKOUT_URL");
   return any || null;
+}
+
+// New: subscription plan → checkout URL
+export function getSubscriptionCheckoutUrl(
+  plan: SubscriptionPlan,
+): string | null {
+  const key = plan.toUpperCase() as "WEEKLY" | "MONTHLY" | "YEARLY";
+  return (
+    env(`NEXT_PUBLIC_WHOP_CHECKOUT_URL_${key}`) ||
+    SUBSCRIPTION_LINKS[key] ||
+    null
+  );
 }
 
 export function setEmailCookie(email: string) {
   if (typeof document === "undefined") return;
   try {
-    // Set HttpOnly cookie via server (cannot be read by JS) and store a non-sensitive hint locally
     fetch("/api/cookies/email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -110,21 +122,10 @@ export function buildCheckoutUrl(
 }
 
 export function isCheckoutConfigured(): boolean {
-  return !!(
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY") ||
-    env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY") ||
-    FALLBACK_LINKS.BASIC_MONTHLY ||
-    FALLBACK_LINKS.BASIC_YEARLY ||
-    FALLBACK_LINKS.PRO_MONTHLY ||
-    FALLBACK_LINKS.PRO_YEARLY
-  );
+  return true; // SUBSCRIPTION_LINKS are always set
 }
 
+// Legacy checkout (plan + billing)
 export function startCheckout(plan: Plan, billing: Billing, email?: string) {
   if (email && email.includes("@")) setEmailCookie(email);
   const url = buildCheckoutUrl(plan, billing, { email });
@@ -135,7 +136,29 @@ export function startCheckout(plan: Plan, billing: Billing, email?: string) {
   if (typeof window !== "undefined") window.location.href = url;
 }
 
-// Extract plan id from a Whop checkout URL like .../plan_XXXX?...  -> returns plan_XXXX
+// New checkout (weekly / monthly / yearly)
+export function startSubscriptionCheckout(
+  plan: SubscriptionPlan,
+  email?: string,
+) {
+  if (email && email.includes("@")) setEmailCookie(email);
+  const base = SUBSCRIPTION_LINKS[plan.toUpperCase() as "WEEKLY" | "MONTHLY" | "YEARLY"];
+  if (!base) {
+    if (typeof window !== "undefined") alert("Checkout not configured");
+    return;
+  }
+  const url = new URL(base);
+  const e = (email || getEmailCookie() || "").trim();
+  if (e) url.searchParams.set("email", e);
+  if (typeof window !== "undefined") {
+    url.searchParams.set(
+      "redirect",
+      `${window.location.origin}/checkout/return`,
+    );
+    window.location.href = url.toString();
+  }
+}
+
 function planIdFromUrl(u?: string): string | null {
   if (!u) return null;
   try {
@@ -143,7 +166,6 @@ function planIdFromUrl(u?: string): string | null {
     const m = url.pathname.match(/\/plan_[A-Za-z0-9]+/);
     return m ? m[0].slice(1) : null;
   } catch {
-    // raw string fallback
     const m = u.match(/\/plan_[A-Za-z0-9]+/);
     return m ? m[0].slice(1) : null;
   }
@@ -151,12 +173,18 @@ function planIdFromUrl(u?: string): string | null {
 
 export function planLabelFromId(id?: string | null): string | null {
   if (!id) return null;
+  const labels: Record<string, string> = {
+    "plan_Gf6WFmHaNBTuE": "Premium Weekly",
+    "plan_WUq3nLCuW4EXU": "Premium Monthly",
+    "plan_NQBXU8gJkERiA": "Premium Yearly",
+  };
+  if (labels[id]) return labels[id];
+  // Fallback: derive from URL map for any env-configured plans
   const map = new Map<string, string>();
   const entries: Array<[string | undefined, string]> = [
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY"), "Basic Monthly"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY"), "Basic Yearly"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY"), "Pro Monthly"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY"), "Pro Yearly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_WEEKLY"), "Weekly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY"), "Monthly"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY"), "Yearly"],
   ];
   for (const [u, label] of entries) {
     const pid = planIdFromUrl(u);
@@ -167,11 +195,17 @@ export function planLabelFromId(id?: string | null): string | null {
 
 export function planTierFromId(id?: string | null): "basic" | "pro" | null {
   if (!id) return null;
+  // All new plans grant full ("pro") access
+  const proPlanIds = new Set([
+    "plan_Gf6WFmHaNBTuE", // weekly
+    "plan_WUq3nLCuW4EXU", // monthly
+    "plan_NQBXU8gJkERiA", // yearly
+  ]);
+  if (proPlanIds.has(id)) return "pro";
+  // Fallback: check env-configured URLs
   const pairs: Array<[string | undefined, "basic" | "pro"]> = [
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_MONTHLY"), "basic"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_BASIC_YEARLY"), "basic"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_MONTHLY"), "pro"],
-    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_PRO_YEARLY"), "pro"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_MONTHLY"), "pro"],
+    [env("NEXT_PUBLIC_WHOP_CHECKOUT_URL_YEARLY"), "pro"],
   ];
   for (const [u, tier] of pairs) {
     const pid = planIdFromUrl(u);
