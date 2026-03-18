@@ -6,17 +6,16 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { VOICES } from "@/components/voices";
-// import Pricing from "@/components/Pricing";
 import PricingModal from "@/components/PricingModal";
-import PricingSidebar from "@/components/PricingSidebar";
-import Onboarding from "@/components/Onboarding";
-import {
-  startCheckout,
-  planLabelFromId,
-  planTierFromId,
-} from "@/utils/checkout";
+import TopBar from "@/components/TopBar";
+import PlaybackBar from "@/components/PlaybackBar";
+import UpgradeBanner from "@/components/UpgradeBanner";
+import Library from "@/components/Library";
+import { useLibrary } from "@/hooks/useLibrary";
+import { parseEpub } from "@/utils/epubParser";
+import { planLabelFromId } from "@/utils/checkout";
+import Walkthrough from "@/components/Walkthrough";
 
 // Debug toggle: set window.DEBUG_FOCUS = true in console to enable verbose logs
 const DEBUG_FOCUS: boolean =
@@ -26,7 +25,7 @@ const dbg = (...args: any[]) => {
 };
 
 // Tokenizer consistent with the server
-const TOKEN_RE = /([A-Za-z0-9][A-Za-z0-9'’\-]*|\s+|[^\sA-Za-z0-9]+)/g;
+const TOKEN_RE = /([A-Za-z0-9][A-Za-z0-9''\-]*|\s+|[^\sA-Za-z0-9]+)/g;
 
 type Token = { t: "word" | "sep"; v: string; wi?: number };
 
@@ -54,27 +53,49 @@ const nextFrame = () =>
     requestAnimationFrame(() => resolve());
   });
 
+// Sample texts for empty state
+const SAMPLES = [
+  {
+    label: "News",
+    title: "The Art of Deep Work",
+    text: `In a world of constant distraction, the ability to focus without interruption has become increasingly rare — and increasingly valuable. Cal Newport calls this "deep work": professional activity performed in a state of distraction-free concentration that pushes your cognitive capabilities to their limit.
+
+These efforts create new value, improve your skill, and are hard to replicate. Deep work is becoming the killer skill of our age. The workers who can perform it will thrive; those who can't will struggle to keep up.`,
+  },
+  {
+    label: "Science",
+    title: "How Memory Consolidates During Sleep",
+    text: `During sleep, the hippocampus replays memories formed during the day, transferring them to the neocortex for long-term storage. This process, called memory consolidation, happens primarily during slow-wave sleep and rapid eye movement sleep.
+
+Researchers have found that getting adequate sleep after learning new material can improve recall by up to 40% compared to pulling an all-nighter. The brain essentially uses the quiet of sleep to organize and strengthen what it has learned.`,
+  },
+  {
+    label: "Fiction",
+    title: "The Last Lighthouse Keeper",
+    text: `The storm had been building for three days when Elena finally saw the light go out. Forty years she had tended the Porthaven lighthouse, through gales that rattled the glass and fog so thick you could taste it. But she had never seen the beam fail.
+
+She pulled on her oilskin and stepped into the wind. The rain came sideways, the kind that found every gap in your clothing. The lighthouse door was unlocked — it was always unlocked — and inside, the smell of salt and machine oil wrapped around her like a memory.`,
+  },
+];
+
 export default function Home() {
   // UI state (SSR-safe defaults; hydrate from localStorage after mount)
   const [theme, setTheme] = useState<string>("white");
   const [voice, setVoice] = useState<string>(VOICES[0].id);
   const [speed, setSpeed] = useState<number>(1.0);
-  const [pitch, setPitch] = useState<number>(0);
   const [align, setAlign] = useState<"left" | "center" | "justify">("center");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const asideRef = useRef<HTMLElement | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [mode, setMode] = useState<"edit" | "read">("edit");
 
   // Editor and reader
   const editorRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
 
-  const PLACEHOLDER = "Paste text here…";
+  const PLACEHOLDER = "Paste any text, article, or URL to start listening…";
   const [text, setText] = useState<string>(PLACEHOLDER);
   const [isPlaceholder, setIsPlaceholder] = useState<boolean>(true);
   const [tokens, setTokens] = useState<Token[]>([]);
-  // const [totalWords, setTotalWords] = useState(0);
 
   // Playback
   const [isPlaying, setIsPlaying] = useState(false);
@@ -128,18 +149,27 @@ export default function Home() {
   } | null>(null);
   // Pricing modal state
   const [showPricing, setShowPricing] = useState<boolean>(false);
-  const [modalContext, setModalContext] = useState<
+  const [modalContext] = useState<
     "play" | "preview-expired" | "sidebar" | "generic"
   >("generic");
   const PREVIEW_SECONDS = Math.max(
     5,
-    Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "30")),
+    Math.min(600, Number(process.env.NEXT_PUBLIC_PREVIEW_SECONDS || "60")),
   );
   const previewTimerRef = useRef<number | null>(null);
-  // Sidebar pricing local state
-  const [sideBilling, setSideBilling] = useState<"monthly" | "yearly">(
-    "monthly",
-  );
+
+  // Library (reading history)
+  const { entries: libraryEntries, addEntry: addLibraryEntry, removeEntry: removeLibraryEntry } = useLibrary();
+
+  // New state
+  const [urlInput, setUrlInput] = useState<string>("");
+  const [fetchingUrl, setFetchingUrl] = useState<boolean>(false);
+  const [showBanner, setShowBanner] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Playback time display state
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [totalDurationMs, setTotalDurationMs] = useState(0);
 
   // Progress ramp timer for determinate bar while awaiting server
   const rampTimerRef = useRef<number | null>(null);
@@ -192,8 +222,6 @@ export default function Home() {
       if (al === "left" || al === "center" || al === "justify") setAlign(al);
       const fs = localStorage.getItem("rf_fontSize") as any;
       if (fs === "sm" || fs === "md" || fs === "lg") setFontSize(fs);
-      const so = localStorage.getItem("rf_sidebarOpen");
-      if (so === "0" || so === "1") setSidebarOpen(so === "1");
       const ra = localStorage.getItem("rf_readAnim");
       if (ra === "1" || ra === "0") setReadAnim(ra === "1");
       // hydrate last used email for entitlement checks
@@ -296,37 +324,21 @@ export default function Home() {
     } catch {}
   }, [email]);
 
-  // Auto open/close sidebar based on cursor proximity
-  useEffect(() => {
-    const HOTSPOT = 48; // px from right edge
-    function onMove(e: MouseEvent) {
-      const x = e.clientX,
-        y = e.clientY;
-      const nearRight = window.innerWidth - x <= HOTSPOT;
-      const el = asideRef.current;
-      const rect = el?.getBoundingClientRect();
-      const inAside = rect
-        ? x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-        : false;
-      if (!sidebarOpen && nearRight) {
-        setSidebarOpen(true);
-      } else if (sidebarOpen && !inAside && !nearRight) {
-        setSidebarOpen(false);
-      }
-    }
-    window.addEventListener("mousemove", onMove);
-    return () => window.removeEventListener("mousemove", onMove);
-  }, [sidebarOpen]);
+  // Toast helper
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  }, []);
 
   const reTokenize = useCallback((value: string) => {
     const tk = tokenize(value);
     setTokens(tk.tokens);
-    // setTotalWords(tk.totalWords);
   }, []);
 
   useEffect(() => {
     reTokenize(text);
   }, [reTokenize, text]);
+
   // When text changes, clear existing audio so Play fetches new synthesis without refresh
   useEffect(() => {
     if (!audioRef.current) return;
@@ -338,11 +350,17 @@ export default function Home() {
     setTimepoints([]);
     setActiveIndex(-1);
   }, [text]);
+
   // Debounce to mark stale state after edits settle
+  const [stale, setStale] = useState<boolean>(false);
+  const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const id = setTimeout(() => setStale(true), 500);
-    return () => clearTimeout(id);
+    staleTimerRef.current = setTimeout(() => setStale(true), 500);
+    return () => {
+      if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
+    };
   }, [text]);
+
   useEffect(() => {
     const el = editorRef.current;
     if (!el || mode !== "edit") return;
@@ -356,7 +374,6 @@ export default function Home() {
   }, [mode, isPlaceholder, text]);
 
   const pendingSeekWiRef = useRef<number | null>(null);
-  const [stale, setStale] = useState<boolean>(false);
 
   // Measure actual durations in the browser to avoid metadata drift
   const probeDurations = async (urls: { url: string }[]): Promise<number[]> => {
@@ -387,8 +404,8 @@ export default function Home() {
     );
   };
 
-  const PROG_INITIAL = 2;
-  const PROG_BATCH = 3;
+  const PROG_INITIAL = 1;
+  const PROG_BATCH = 5;
   const progTokenRef = useRef<number>(0);
 
   const appendProgressive = useCallback(
@@ -398,7 +415,6 @@ export default function Home() {
     ) => {
       // Append to refs
       const oldSegs = segmentsRef.current;
-      const startIdx = oldSegs.length;
       const newSegs = [...oldSegs, ...urls];
       segmentsRef.current = newSegs;
       // Measure only appended segments
@@ -594,21 +610,14 @@ export default function Home() {
         setProgress((v) => (v < 0.9 ? 0.9 : v));
         await nextFrame();
 
-        // Build duration-based offsets and word counts per segment for robust sync
-        // Prefer conservative durations: use max(measured, server) to avoid running ahead
-        const measured = await probeDurations(urls);
-        measuredDurMsRef.current = measured.map((m, i) =>
-          Math.max(m || 0, urls[i].durationMs || 0),
-        );
-        // Metadata probed; almost done
-        setProgress((v) => (v < 0.93 ? 0.93 : v));
-        await nextFrame();
+        // Use server-reported durations immediately so playback can start without waiting for metadata probing
+        const initDurations = urls.map((u) => u.durationMs || 3000);
+        measuredDurMsRef.current = initDurations;
         const durOffsets: number[] = [];
         let accDur = 0;
-        for (let i = 0; i < urls.length; i++) {
-          const useMs = measuredDurMsRef.current[i] || urls[i].durationMs || 0;
+        for (const d of initDurations) {
           durOffsets.push(accDur);
-          accDur += Math.max(0, useMs);
+          accDur += Math.max(0, d);
         }
         durOffsetsRef.current = durOffsets;
         const wordsPer: number[] = [];
@@ -623,6 +632,28 @@ export default function Home() {
         wordsPerSegRef.current = wordsPer;
 
         setProgress((v) => (v < 0.95 ? 0.95 : v));
+
+        // Probe actual durations in the background; update refs silently once available
+        probeDurations(urls)
+          .then((measured) => {
+            const refined = measured.map((m, i) =>
+              Math.max(m || 0, urls[i].durationMs || 0),
+            );
+            measuredDurMsRef.current = refined;
+            const refOffsets: number[] = [];
+            let acc = 0;
+            for (const d of refined) {
+              refOffsets.push(acc);
+              acc += Math.max(0, d);
+            }
+            durOffsetsRef.current = refOffsets;
+          })
+          .catch(() => {});
+        // Cancel any pending stale timer so synthesis stays fresh after fast play
+        if (staleTimerRef.current) {
+          clearTimeout(staleTimerRef.current);
+          staleTimerRef.current = null;
+        }
         setStale(false);
 
         // Progressive background fetch of remaining chunks
@@ -682,7 +713,7 @@ export default function Home() {
         }
       } catch (err) {
         const message = (err as Error)?.message || "TTS failed";
-        if (typeof window !== "undefined") alert(message);
+        showToast(message);
         setLoading(false);
         setProgress(0);
         if (rampTimerRef.current) {
@@ -692,7 +723,7 @@ export default function Home() {
         throw err;
       }
     },
-    [text, voice, speed],
+    [text, voice, speed, showToast],
   );
 
   // Keep a ref mirror of timepoints so the RAF loop doesn't depend on closures
@@ -734,8 +765,14 @@ export default function Home() {
 
   const startPlayback = useCallback(async () => {
     setMode("read");
+    // Auto-save to library when starting playback
+    if (!isPlaceholder && text.trim()) {
+      const title = text.trim().split("\n")[0].slice(0, 60).trim();
+      const wc = tokens.filter((t) => t.t === "word").length;
+      addLibraryEntry({ title, text: text.trim(), wordCount: wc });
+    }
     await prepareRequest({ progressive: true });
-  }, [prepareRequest]);
+  }, [prepareRequest, isPlaceholder, text, tokens, addLibraryEntry]);
 
   const seekToWord = useCallback((wi: number) => {
     if (wi < 0) return;
@@ -834,13 +871,13 @@ export default function Home() {
           .catch(() => {
             setLoading(false);
             setProgress(0);
-            alert("Audio decode error");
+            showToast("Audio decode error");
           });
         return;
       }
       setLoading(false);
       setProgress(0);
-      alert("Audio decode error");
+      showToast("Audio decode error");
     };
     audio.addEventListener("loadedmetadata", onMeta, { once: true });
     audio.addEventListener(
@@ -907,16 +944,12 @@ export default function Home() {
       audio.removeEventListener("error", onError);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [segments, segmentOffsets, prepareRequest, seekToWord]);
+  }, [segments, segmentOffsets, prepareRequest, seekToWord, showToast]);
 
   // Always play synthesized audio at native speed; we encode speakingRate at synthesis time
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = 1;
   }, [speed]);
-  // Mark stale on voice/speed/pitch change (so next Play regenerates)
-  useEffect(() => {
-    setStale(true);
-  }, [voice, speed]);
   // Mirror activeIndex into ref for RAF continuity
   useEffect(() => {
     activeRef.current = activeIndex;
@@ -931,14 +964,20 @@ export default function Home() {
       return;
     }
 
+    // Guard: require real text before hitting the API
+    if (isPlaceholder || !text.trim()) {
+      showToast("Paste some text to start listening.");
+      return;
+    }
+
+    // Switch to read mode when starting playback
+    setMode("read");
+
     // Non-entitled: start preview flow
     if (!entitledRef.current) {
       // Prepare preview without background fetch
-      await prepareRequest({ progressive: true, preview: true });
-      // Open pricing modal but do not block preview
-      setModalContext("play");
-      setShowPricing(true);
-      // Start timer to stop preview
+      await prepareRequest({ progressive: false, preview: true });
+      // Start timer to stop preview and show banner
       if (previewTimerRef.current) {
         clearTimeout(previewTimerRef.current);
         previewTimerRef.current = null;
@@ -948,8 +987,7 @@ export default function Home() {
           audioRef.current.pause();
           setIsPlaying(false);
         }
-        setModalContext("preview-expired");
-        setShowPricing(true);
+        setShowBanner(true);
       }, PREVIEW_SECONDS * 1000);
     }
 
@@ -1018,12 +1056,54 @@ export default function Home() {
     setIsPlaying(true);
   }, [
     isPlaying,
+    isPlaceholder,
+    text,
+    showToast,
     startPlayback,
     stale,
     seekToWord,
     prepareRequest,
     PREVIEW_SECONDS,
   ]);
+
+  const stopAndClear = useCallback(() => {
+    // Cancel background progressive fetch
+    progTokenRef.current++;
+    // Stop audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+    // Reset all playback refs
+    segmentsRef.current = [];
+    segStartMsRef.current = [];
+    segmentRangesRef.current = [];
+    tpByWiRef.current = new Map();
+    durOffsetsRef.current = [];
+    measuredDurMsRef.current = [];
+    wordsPerSegRef.current = [];
+    timepointsRef.current = [];
+    totalWordsRef.current = 0;
+    completedRef.current = false;
+    currentSegment.current = 0;
+    pendingSeekWiRef.current = null;
+    // Reset state
+    setSegments([]);
+    setSegmentOffsets([]);
+    setTimepoints([]);
+    setIsPlaying(false);
+    setActiveIndex(-1);
+    setCurrentTimeMs(0);
+    setTotalDurationMs(0);
+    setLoading(false);
+    setProgress(0);
+    setShowBanner(false);
+    setStale(false);
+    // Clear text and go back to edit mode
+    setText(PLACEHOLDER);
+    setIsPlaceholder(true);
+    setMode("edit");
+  }, [PLACEHOLDER]);
 
   const seekBy = useCallback((delta: number) => {
     if (!audioRef.current) return;
@@ -1067,7 +1147,10 @@ export default function Home() {
   // Change voice mid-read: resynthesize and resume from current word
   const changeVoice = useCallback(
     async (v: string) => {
-      // Pause and clear current playback to avoid mixing old/new segments
+      // Capture position and play state BEFORE clearing anything
+      const resumeWi = activeRef.current >= 0 ? activeRef.current : 0;
+      const wasPlaying = isPlayingRef.current;
+
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = "";
@@ -1082,18 +1165,13 @@ export default function Home() {
       setVoice(v);
       if (typeof window !== "undefined") localStorage.setItem("rf_voice", v);
 
-      const targetWi = activeRef.current >= 0 ? activeRef.current : 0;
-      pendingSeekWiRef.current = targetWi;
       try {
         await prepareRequest({ voice: v, progressive: true });
-        // Seek to the previous word after new audio/timepoints are set
-        setTimeout(() => {
-          const wi = pendingSeekWiRef.current;
-          pendingSeekWiRef.current = null;
-          if (wi != null) {
-            seekToWord(wi);
-          }
-        }, 0);
+        seekToWord(resumeWi);
+        if (wasPlaying && audioRef.current) {
+          audioRef.current.play().catch(() => {});
+          setIsPlaying(true);
+        }
       } catch (e) {
         // keep paused on failure
       }
@@ -1104,6 +1182,10 @@ export default function Home() {
   // Change speed mid-read: resynthesize with speakingRate and resume
   const changeSpeed = useCallback(
     async (s: number) => {
+      // Capture position and play state BEFORE clearing anything
+      const resumeWi = activeRef.current >= 0 ? activeRef.current : 0;
+      const wasPlaying = isPlayingRef.current;
+
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = "";
@@ -1119,17 +1201,13 @@ export default function Home() {
       if (typeof window !== "undefined")
         localStorage.setItem("rf_speed", String(s));
 
-      const targetWi = activeRef.current >= 0 ? activeRef.current : 0;
-      pendingSeekWiRef.current = targetWi;
       try {
         await prepareRequest({ speed: s, progressive: true });
-        setTimeout(() => {
-          const wi = pendingSeekWiRef.current;
-          pendingSeekWiRef.current = null;
-          if (wi != null) {
-            seekToWord(wi);
-          }
-        }, 0);
+        seekToWord(resumeWi);
+        if (wasPlaying && audioRef.current) {
+          audioRef.current.play().catch(() => {});
+          setIsPlaying(true);
+        }
       } catch (e) {
         // keep paused on failure
       }
@@ -1256,16 +1334,14 @@ export default function Home() {
       if (file.type === "text/plain") {
         const t = await file.text();
         setText(t);
+        setIsPlaceholder(false);
         reTokenize(t);
         return;
       }
       if (file.type === "application/pdf") {
         const pdfjs = await import("pdfjs-dist");
-        const worker = await import("pdfjs-dist/build/pdf.worker.mjs");
-        // Assign worker module for pdfjs (types may be missing in package)
-        (
-          pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: unknown } }
-        ).GlobalWorkerOptions.workerSrc = worker;
+        // Point to CDN-hosted worker matching installed version (avoids module-object assignment error)
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
         const arrayBuffer = await file.arrayBuffer();
         const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
@@ -1278,557 +1354,504 @@ export default function Home() {
               .map((it: any) => (typeof it.str === "string" ? it.str : ""))
               .join(" ") + "\n\n";
         }
-        setText(full.trim());
-        reTokenize(full.trim());
+        const cleaned = full.trim();
+        if (!cleaned) { showToast("Could not extract text from PDF."); return; }
+        setText(cleaned);
+        setIsPlaceholder(false);
+        setMode("read");
+        reTokenize(cleaned);
         return;
       }
-      alert("Unsupported file type. Use TXT or PDF.");
+      if (file.name.endsWith(".epub") || file.type === "application/epub+zip") {
+        try {
+          const { title, text: t } = await parseEpub(file);
+          const content = title ? `${title}\n\n${t}` : t;
+          setText(content);
+          setIsPlaceholder(false);
+          reTokenize(content);
+        } catch {
+          showToast("Failed to parse EPUB file.");
+        }
+        return;
+      }
+      showToast("Unsupported file type. Use TXT, PDF, or EPUB.");
     },
-    [reTokenize],
+    [reTokenize, showToast],
   );
 
+  // URL fetching
+  const fetchUrl = useCallback(async () => {
+    if (!urlInput.trim()) return;
+    setFetchingUrl(true);
+    try {
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Failed to fetch URL");
+        return;
+      }
+      const extracted = data.text as string;
+      setText(extracted);
+      setIsPlaceholder(false);
+      setUrlInput("");
+      setMode("edit");
+      reTokenize(extracted);
+    } catch {
+      showToast("Failed to fetch URL");
+    } finally {
+      setFetchingUrl(false);
+    }
+  }, [urlInput, reTokenize, showToast]);
+
+  // Update playback time display
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => {
+      const segIdx = currentSegment.current;
+      const starts = durOffsetsRef.current;
+      const audio = audioRef.current;
+      if (audio && starts.length > 0) {
+        const cur = (starts[segIdx] || 0) + audio.currentTime * 1000;
+        setCurrentTimeMs(Math.round(cur));
+        const segs = segmentsRef.current;
+        if (segs.length > 0) {
+          const last = segs.length - 1;
+          const tot = (starts[last] || 0) + (measuredDurMsRef.current[last] || segs[last]?.durationMs || 0);
+          setTotalDurationMs(Math.round(tot));
+        }
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [isPlaying]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (document.activeElement as HTMLElement)?.isContentEditable) return;
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        seekBy(-10_000);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        seekBy(10_000);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const speeds = [0.75, 1, 1.25, 1.5, 2];
+        const idx = speeds.indexOf(speed);
+        if (idx < speeds.length - 1) changeSpeed(speeds[idx + 1]);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const speeds = [0.75, 1, 1.25, 1.5, 2];
+        const idx = speeds.indexOf(speed);
+        if (idx > 0) changeSpeed(speeds[idx - 1]);
+      } else if (e.key === "Escape") {
+        stopAndClear();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlay, seekBy, speed, changeSpeed, stopAndClear]);
+
+  // Compute word count for estimated listen time
+  const wordCountForTime = useMemo(() => {
+    return tokens.filter(t => t.t === "word").length;
+  }, [tokens]);
+
+  function estimatedMinutes(wc: number, spd: number) {
+    const wordsPerMin = 150 * spd;
+    return Math.max(1, Math.round(wc / wordsPerMin));
+  }
+
+  const hasText = !isPlaceholder && text.trim().length > 0;
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Onboarding />
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--fg)" }}>
       {/* Top loading bar */}
       <div className={classNames("progress", loading && "active")}>
-        <div
-          className="bar"
-          style={{ width: `${Math.round(progress * 100)}%` }}
-        />
+        <div className="bar" style={{ width: `${Math.round(progress * 100)}%` }} />
       </div>
-      {/* Sidebar toggle */}
-      <button
-        className="btn sidebar-toggle"
-        onClick={() => setSidebarOpen((s) => !s)}
-      >
-        Sidebar
-      </button>
 
-      {/* Right sidebar */}
-      <aside
-        ref={asideRef}
-        className={classNames("sidebar", sidebarOpen && "open")}
-      >
-        <div className="p-4 flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Controls</h2>
-          <div className="flex items-center gap-2">
-            <Link href="/pricing" className="btn">
-              Pricing
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="btn" onClick={togglePlay}>
-              {isPlaying ? "Pause" : "Play"}
-            </button>
-            {stale && <span className="badge updated">Updated</span>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm">Voice</label>
-            <div className="flex gap-2 items-center flex-wrap">
-              <select
-                className="btn"
-                value={voice}
-                onChange={(e) => changeVoice(e.target.value)}
-              >
-                {VOICES.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn"
-                onClick={previewVoice}
-                disabled={previewLoading}
-              >
-                {previewLoading ? "Preview…" : "Preview"}
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm">Speed</label>
-            <div className="flex flex-wrap gap-2">
-              {[0.5, 0.75, 1, 1.25, 1.5].map((v) => (
-                <button
-                  key={v}
-                  className="btn"
-                  onClick={() => changeSpeed(v)}
-                  aria-pressed={speed === v}
-                >
-                  {v}×
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm">Theme</label>
-            <select
-              className="btn"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
+      {/* Toast notification */}
+      {toastMsg && (
+        <div className="toast visible" role="alert">{toastMsg}</div>
+      )}
+
+
+      <TopBar
+        voice={voice}
+        onVoiceChange={changeVoice}
+        speed={speed}
+        onSpeedChange={changeSpeed}
+        isPlaying={isPlaying}
+        loading={loading}
+        onTogglePlay={togglePlay}
+        theme={theme}
+        onThemeChange={setTheme}
+        entitled={entitled}
+        email={email}
+        onSubscribeClick={() => setShowPricing(true)}
+        onMenuClick={() => setSidebarOpen(s => !s)}
+        hasAudio={segmentsRef.current.length > 0 || isPlaying}
+        onStop={stopAndClear}
+      />
+
+      {/* ── MAIN CONTENT ───────────────────────────────────────────── */}
+      <main className="flex-1">
+        <div className="reader-content">
+          {/* URL input row */}
+          <div className="url-row">
+            <input
+              data-tour="url-input"
+              type="url"
+              placeholder="Paste a URL to fetch article text…"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") fetchUrl(); }}
+              aria-label="Article URL"
+            />
+            <button
+              className="btn btn-sm"
+              onClick={fetchUrl}
+              disabled={fetchingUrl || !urlInput.trim()}
+              style={{ whiteSpace: "nowrap", fontFamily: "var(--font-ui)" }}
             >
-              <option value="white">White</option>
-              <option value="beige">Beige</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm" htmlFor="read-anim">
-              Smooth fade future text
-            </label>
-            <input
-              id="read-anim"
-              type="checkbox"
-              checked={readAnim}
-              onChange={(e) => setReadAnim(e.target.checked)}
-            />
-          </div>
-          <div className="flex gap-2 items-center flex-wrap">
-            <button className="btn" onClick={() => setAlign("left")}>
-              Left
+              {fetchingUrl ? "Fetching…" : "Fetch"}
             </button>
-            <button className="btn" onClick={() => setAlign("center")}>
-              Center
-            </button>
-            <button className="btn" onClick={() => setAlign("justify")}>
-              Justify
-            </button>
-          </div>
-          <div className="flex gap-2 items-center flex-wrap">
-            <button className="btn" onClick={() => setFontSize("sm")}>
-              A−
-            </button>
-            <button className="btn" onClick={() => setFontSize("md")}>
-              A
-            </button>
-            <button className="btn" onClick={() => setFontSize("lg")}>
-              A+
-            </button>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="btn" htmlFor="file">
-              Import (TXT/PDF)
-            </label>
-            <input
-              id="file"
-              type="file"
-              className="hidden"
-              accept=".txt,application/pdf"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) importFile(f);
-                e.currentTarget.value = "";
-              }}
-            />
-          </div>
-          <div className="flex gap-2 items-center">
-            <button className="btn" onClick={() => seekBy(-10_000)}>
-              −10s
-            </button>
-            <button className="btn" onClick={() => seekBy(10_000)}>
-              +10s
-            </button>
-          </div>
-          <div className="flex gap-2 items-center">
-            {mode === "edit" ? (
-              <>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setMode("read");
-                    reTokenize(text);
-                  }}
-                >
-                  Switch to Read
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    if (editorRef.current) {
-                      editorRef.current.innerText = PLACEHOLDER;
-                    }
-                    setText("");
-                    setIsPlaceholder(true);
-                    setMode("edit");
-                    setSegments([]);
-                    setTimepoints([]);
-                    setActiveIndex(-1);
-                    if (audioRef.current) {
-                      audioRef.current.pause();
-                      audioRef.current.src = "";
-                    }
-                  }}
-                >
-                  Clear text
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="btn" onClick={() => setMode("edit")}>
-                  Edit Text
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setMode("edit");
-                    setTimeout(() => {
-                      if (editorRef.current) {
-                        const r = document.createRange();
-                        r.selectNodeContents(editorRef.current);
-                        const sel = window.getSelection();
-                        sel?.removeAllRanges();
-                        sel?.addRange(r);
-                      }
-                    }, 0);
-                  }}
-                >
-                  Select All
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setMode("edit");
-                    setTimeout(() => {
-                      if (editorRef.current) {
-                        editorRef.current.innerText = "";
-                        setText("");
-                        setIsPlaceholder(false);
-                        editorRef.current.focus();
-                      }
-                    }, 0);
-                  }}
-                >
-                  Clear text
-                </button>
-              </>
-            )}
-          </div>
-          {/* Pro features below controls */}
-          <div className="mt-2 card">
-            <h4 className="font-semibold mb-1">Pro Features</h4>
-            <div className="flex flex-col gap-2">
-              {/* Determine if current plan is Pro */}
-              {entitled && planTierFromId(entInfo?.planId) === "pro" ? (
-                <>
-                  <button
-                    className="btn"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/export", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            text,
-                            voice,
-                            speed,
-                            container: "mp3",
-                            email,
-                          }),
-                        });
-                        const j = await res.json();
-                        if (!res.ok) {
-                          alert(j?.error || "Export failed");
-                          return;
-                        }
-                        window.open(j.downloadUrl, "_blank");
-                      } catch (e) {
-                        alert("Export failed");
-                      }
-                    }}
-                  >
-                    Export MP3
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/export", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            text,
-                            voice,
-                            speed,
-                            container: "mp3",
-                            email,
-                          }),
-                        });
-                        const j = await res.json();
-                        if (!res.ok) {
-                          alert(j?.error || "Export failed");
-                          return;
-                        }
-                        const code = j.embedCode as string;
-                        try {
-                          await navigator.clipboard.writeText(code);
-                          alert("Embed code copied");
-                        } catch {
-                          alert(code);
-                        }
-                      } catch (e) {
-                        alert("Embed failed");
-                      }
-                    }}
-                  >
-                    Get Embed Code
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className="btn" disabled title="Pro only">
-                    Export MP3 (Pro)
-                  </button>
-                  <button className="btn" disabled title="Pro only">
-                    Get Embed Code (Pro)
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setModalContext("sidebar");
-                      setShowPricing(true);
-                    }}
-                  >
-                    Upgrade to Pro
-                  </button>
-                </>
-              )}
-            </div>
           </div>
 
-          {/* Active plan summary or subscribe card */}
-          {entitled ? (
-            <div className="mt-2 card">
-              <h4 className="font-semibold mb-1">Active plan</h4>
-              <div className="text-sm opacity-85">
-                <div>Email: {email || "—"}</div>
-                <div>
-                  Plan:{" "}
-                  {planLabelFromId(entInfo?.planId) || entInfo?.planId || "—"}
-                </div>
-                <div>
-                  {typeof entInfo?.periodEnd === "number"
-                    ? `Expires: ${new Date(entInfo!.periodEnd!).toLocaleDateString()}`
-                    : "No expiry"}
+          {/* Empty state: show when no text */}
+          {!hasText && (
+            <div>
+              <div
+                data-tour="text-editor"
+                ref={editorRef}
+                className={classNames("editor", "placeholder")}
+                contentEditable
+                suppressContentEditableWarning
+                dir="ltr"
+                style={{ textAlign: "left", fontSize: "clamp(18px, 4vw, 26px)" }}
+                onFocus={() => {
+                  if (isPlaceholder && editorRef.current) {
+                    editorRef.current.innerText = "";
+                    setIsPlaceholder(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (editorRef.current && !editorRef.current.innerText.trim()) {
+                    editorRef.current.innerText = "Paste any text, article, or URL to start listening…";
+                    setIsPlaceholder(true);
+                    setText("");
+                  }
+                }}
+                onInput={(e) => {
+                  const t = (e.target as HTMLDivElement).innerText;
+                  setText(t);
+                  setIsPlaceholder(false);
+                }}
+                onPaste={(e) => {
+                  setTimeout(() => {
+                    const t = (e.target as HTMLDivElement).innerText;
+                    setText(t);
+                    setIsPlaceholder(false);
+                    setMode("read");
+                    reTokenize(t);
+                  }, 0);
+                }}
+              >
+                Paste any text, article, or URL to start listening…
+              </div>
+
+              <div style={{ marginTop: 24 }}>
+                <p style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+                  Try a sample
+                </p>
+                <div className="samples-grid">
+                  {SAMPLES.map((s, i) => (
+                    <button
+                      key={i}
+                      className="sample-card"
+                      onClick={() => {
+                        setText(s.text);
+                        setIsPlaceholder(false);
+                        setMode("read");
+                        reTokenize(s.text);
+                        // Auto-play after a small delay
+                        setTimeout(() => togglePlay(), 300);
+                      }}
+                    >
+                      <div className="sample-card-label">{s.label}</div>
+                      <div className="sample-card-title">{s.title}</div>
+                      <div className="sample-card-preview">{s.text.slice(0, 100)}…</div>
+                      <div className="sample-play-hint">▶ Play sample</div>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="mt-2 flex gap-2">
-                <button
-                  className="btn"
-                  onClick={async () => {
-                    try {
-                      const em = email.trim();
-                      if (!em) return;
-                      await fetch("/api/whop/verify", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: em }),
-                      });
-                      const r3 = await fetch(
-                        `/api/entitlements?email=${encodeURIComponent(em)}`,
-                      );
-                      const j3 = await r3.json();
-                      if (j3?.entitled) {
-                        setEntitled(true);
-                        if (j3?.entitlement)
-                          setEntInfo({
-                            planId: j3.entitlement.planId,
-                            periodEnd: j3.entitlement.periodEnd,
-                          });
-                      }
-                    } catch {}
-                  }}
-                >
-                  Verify now
-                </button>
-                {/* Upgrade option if currently on Basic (or unknown) */}
-                {planTierFromId(entInfo?.planId) !== "pro" && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setModalContext("sidebar");
-                      setShowPricing(true);
-                    }}
-                  >
-                    Upgrade to Pro
-                  </button>
-                )}
-              </div>
+              <Library
+                entries={libraryEntries}
+                onSelect={(entry) => {
+                  setText(entry.text);
+                  setIsPlaceholder(false);
+                  reTokenize(entry.text);
+                }}
+                onRemove={removeLibraryEntry}
+              />
             </div>
-          ) : (
-            <div className="mt-2">
-              <PricingSidebar
-                billing={sideBilling as any}
-                onBillingChange={(b: any) => setSideBilling(b)}
-                email={email}
-                onEmailChange={(e: string) => setEmail(e)}
-                onCheckout={(p: any, b: any, em: string) =>
-                  startCheckout(p, b, em)
-                }
-                entitled={false}
-                onVerified={(info) => {
-                  if (info) setEntInfo(info);
-                  setEntitled(true);
+          )}
+
+          {/* Text loaded: show editor (when paused/stopped) or reader (when playing) */}
+          {hasText && mode === "edit" && (
+            <div>
+              {/* Estimated listen time */}
+              {wordCountForTime > 50 && (
+                <div style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--muted)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>~{estimatedMinutes(wordCountForTime, speed)} min listen at {speed}×</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-sm" onClick={() => setFontSize("sm")} aria-pressed={fontSize === "sm"} title="Small text">A−</button>
+                    <button className="btn btn-sm" onClick={() => setFontSize("md")} aria-pressed={fontSize === "md"} title="Medium text">A</button>
+                    <button className="btn btn-sm" onClick={() => setFontSize("lg")} aria-pressed={fontSize === "lg"} title="Large text">A+</button>
+                    <label data-tour="file-import" className="btn btn-sm" htmlFor="file-input" style={{ cursor: "pointer" }}>Import</label>
+                    <input
+                      id="file-input"
+                      type="file"
+                      className="hidden"
+                      accept=".txt,.epub,application/pdf,application/epub+zip"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) importFile(f);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        if (editorRef.current) editorRef.current.innerText = "Paste any text, article, or URL to start listening…";
+                        setText("");
+                        setIsPlaceholder(true);
+                        setSegments([]);
+                        setTimepoints([]);
+                        setActiveIndex(-1);
+                        if (audioRef.current) {
+                          audioRef.current.pause();
+                          audioRef.current.src = "";
+                        }
+                      }}
+                      title="Clear text"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div
+                ref={editorRef}
+                className={classNames(
+                  "editor",
+                  fontSize === "sm" && "reader-sm",
+                  fontSize === "md" && "reader-md",
+                  fontSize === "lg" && "reader-lg",
+                )}
+                contentEditable
+                suppressContentEditableWarning
+                dir="ltr"
+                style={{ textAlign: align as any }}
+                onFocus={() => {
+                  if (isPlaceholder && editorRef.current) {
+                    editorRef.current.innerText = "";
+                    setIsPlaceholder(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (editorRef.current && !editorRef.current.innerText.trim()) {
+                    editorRef.current.innerText = "Paste any text, article, or URL to start listening…";
+                    setIsPlaceholder(true);
+                    setText("");
+                  }
+                }}
+                onInput={(e) => {
+                  const t = (e.target as HTMLDivElement).innerText;
+                  setText(t);
+                  setIsPlaceholder(false);
+                }}
+                onPaste={(e) => {
+                  setTimeout(() => {
+                    const t = (e.target as HTMLDivElement).innerText;
+                    setText(t);
+                    setIsPlaceholder(false);
+                    setMode("read");
+                    reTokenize(t);
+                  }, 0);
                 }}
               />
             </div>
           )}
 
-          {/* Pro tools for active Pro plans */}
-          {entitled && planTierFromId(entInfo?.planId) === "pro" && (
-            <div className="mt-2 card">
-              <h4 className="font-semibold mb-1">Pro Tools</h4>
-              <div className="flex flex-col gap-2">
-                <button
-                  className="btn"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch("/api/export", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          text,
-                          voice,
-                          speed,
-                          container: "mp3",
-                          email,
-                        }),
-                      });
-                      const j = await res.json();
-                      if (!res.ok) {
-                        alert(j?.error || "Export failed");
-                        return;
-                      }
-                      window.open(j.downloadUrl, "_blank");
-                    } catch (e) {
-                      alert("Export failed");
-                    }
-                  }}
-                >
-                  Export MP3
-                </button>
-                <button
-                  className="btn"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch("/api/export", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          text,
-                          voice,
-                          speed,
-                          container: "mp3",
-                          email,
-                        }),
-                      });
-                      const j = await res.json();
-                      if (!res.ok) {
-                        alert(j?.error || "Export failed");
-                        return;
-                      }
-                      const code = j.embedCode as string;
-                      try {
-                        await navigator.clipboard.writeText(code);
-                        alert("Embed code copied");
-                      } catch {
-                        alert(code);
-                      }
-                    } catch (e) {
-                      alert("Embed failed");
-                    }
-                  }}
-                >
-                  Get Embed Code
-                </button>
+          {hasText && mode === "read" && (
+            <div>
+              {/* Reader controls bar */}
+              <div style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--muted)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>~{estimatedMinutes(wordCountForTime, speed)} min at {speed}×{stale && <span className="badge updated" style={{ marginLeft: 8 }}>Updated</span>}</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-sm" onClick={() => setFontSize("sm")} aria-pressed={fontSize === "sm"}>A−</button>
+                  <button className="btn btn-sm" onClick={() => setFontSize("md")} aria-pressed={fontSize === "md"}>A</button>
+                  <button className="btn btn-sm" onClick={() => setFontSize("lg")} aria-pressed={fontSize === "lg"}>A+</button>
+                  <button className="btn btn-sm" onClick={() => setMode("edit")}>Edit</button>
+                </div>
+              </div>
+              <div
+                ref={readerRef}
+                className={classNames(
+                  fontSize === "sm" && "reader-sm",
+                  fontSize === "md" && "reader-md",
+                  fontSize === "lg" && "reader-lg",
+                )}
+                dir="ltr"
+                style={{ textAlign: align as any }}
+              >
+                {rendered}
               </div>
             </div>
           )}
         </div>
-      </aside>
-
-      {/* Main area */}
-      <main className="container flex-1 p-6">
-        {/* Editor */}
-        {mode === "edit" && (
-          <div
-            ref={editorRef}
-            className={classNames(
-              "editor",
-              isPlaceholder && "placeholder",
-              fontSize === "sm" && "text-[18px]",
-              fontSize === "md" && "text-[26px]",
-              fontSize === "lg" && "text-[34px]",
-            )}
-            contentEditable
-            suppressContentEditableWarning
-            dir="ltr"
-            style={{ textAlign: align as any }}
-            onFocus={(e) => {
-              if (isPlaceholder && editorRef.current) {
-                editorRef.current.innerText = "";
-                setIsPlaceholder(false);
-              }
-            }}
-            onBlur={(e) => {
-              if (editorRef.current && !editorRef.current.innerText.trim()) {
-                editorRef.current.innerText = PLACEHOLDER;
-                setIsPlaceholder(true);
-                setText("");
-              }
-            }}
-            onInput={(e) => {
-              const t = (e.target as HTMLDivElement).innerText;
-              setText(t);
-              setIsPlaceholder(false);
-            }}
-            onPaste={(e) => {
-              setTimeout(() => {
-                const t = (e.target as HTMLDivElement).innerText;
-                setText(t);
-                setIsPlaceholder(false);
-                setMode("read");
-                reTokenize(t);
-              }, 0);
-            }}
-          >
-            {isPlaceholder ? PLACEHOLDER : undefined}
-          </div>
-        )}
-
-        {/* Reader */}
-        {mode === "read" && (
-          <div
-            ref={readerRef}
-            className={classNames(
-              fontSize === "sm" && "text-[18px]",
-              fontSize === "md" && "text-[26px]",
-              fontSize === "lg" && "text-[34px]",
-              "leading-relaxed",
-            )}
-            dir="ltr"
-            style={{ textAlign: align as any }}
-          >
-            {rendered}
-          </div>
-        )}
       </main>
-      {/* Hidden audio element to ensure autoplay policies and reliable events */}
+
+      {/* Hidden audio element */}
       <audio ref={audioRef} className="hidden" preload="auto" playsInline />
 
-      {/* Pricing modal */}
+      <PlaybackBar
+        visible={isPlaying || (segments.length > 0 && !showBanner)}
+        currentTimeMs={currentTimeMs}
+        totalDurationMs={totalDurationMs}
+        isPlaying={isPlaying}
+        onTogglePlay={togglePlay}
+        onSeekBy={seekBy}
+        onSeekToFraction={(frac) => {
+          const target = frac * totalDurationMs;
+          const starts = durOffsetsRef.current;
+          const segs = segmentsRef.current;
+          let seg = 0;
+          for (let i = starts.length - 1; i >= 0; i--) {
+            if (starts[i] <= target) { seg = i; break; }
+          }
+          if (segs[seg] && audioRef.current) {
+            currentSegment.current = seg;
+            audioRef.current.src = segs[seg].url;
+            const localMs = target - (starts[seg] || 0);
+            audioRef.current.currentTime = localMs / 1000;
+            if (isPlayingRef.current) audioRef.current.play().catch(() => {});
+          }
+        }}
+      />
+
+      <UpgradeBanner
+        visible={showBanner && !entitled}
+        estimatedMinutes={wordCountForTime > 0 ? estimatedMinutes(wordCountForTime, speed) : 0}
+        email={email}
+        onEmailChange={setEmail}
+        onDismiss={() => setShowBanner(false)}
+        onVerifyEmail={() => { setShowBanner(false); setShowPricing(true); }}
+      />
+
+      {/* Mobile drawer for settings */}
+      <div className={classNames("mobile-drawer", sidebarOpen && "open")}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "var(--font-ui)", fontSize: 16, fontWeight: 600 }}>Settings</h2>
+          <button className="btn btn-sm" onClick={() => setSidebarOpen(false)}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "var(--font-ui)" }}>
+          <div>
+            <label style={{ fontSize: 13, color: "var(--muted)", display: "block", marginBottom: 6 }}>Voice</label>
+            <select className="btn" value={voice} onChange={(e) => changeVoice(e.target.value)} style={{ width: "100%" }}>
+              {VOICES.map((v) => (
+                <option key={v.id} value={v.id}>{v.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 13, color: "var(--muted)", display: "block", marginBottom: 6 }}>Speed</label>
+            <div className="speed-seg" style={{ width: "100%" }}>
+              {([0.75, 1, 1.25, 1.5, 2] as number[]).map((s) => (
+                <button key={s} aria-pressed={speed === s} onClick={() => changeSpeed(s)} style={{ flex: 1 }}>
+                  {s}×
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 13, color: "var(--muted)", display: "block", marginBottom: 6 }}>Theme</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["white", "beige", "dark"].map((t) => (
+                <button key={t} className="btn" aria-pressed={theme === t} onClick={() => setTheme(t)} style={{ flex: 1, textTransform: "capitalize" }}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 13, color: "var(--muted)", display: "block", marginBottom: 6 }}>Text alignment</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {(["left", "center", "justify"] as const).map((a) => (
+                <button key={a} className="btn" aria-pressed={align === a} onClick={() => setAlign(a)} style={{ flex: 1 }}>{a}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="btn" htmlFor="file-input-mobile" style={{ display: "block", textAlign: "center", cursor: "pointer" }}>Import TXT/PDF/EPUB</label>
+            <input
+              id="file-input-mobile"
+              type="file"
+              className="hidden"
+              accept=".txt,.epub,application/pdf,application/epub+zip"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importFile(f);
+                e.currentTarget.value = "";
+                setSidebarOpen(false);
+              }}
+            />
+          </div>
+          {entitled ? (
+            <div style={{ fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Active plan</div>
+              <div style={{ color: "var(--muted)" }}>{email || "—"}</div>
+              <div style={{ color: "var(--muted)" }}>{planLabelFromId(entInfo?.planId) || entInfo?.planId || "—"}</div>
+            </div>
+          ) : (
+            <button className="btn btn-primary" onClick={() => { setShowPricing(true); setSidebarOpen(false); }} style={{ width: "100%" }}>
+              Subscribe
+            </button>
+          )}
+          <div style={{ fontSize: 12, color: "var(--muted)", borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Keyboard shortcuts</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div><kbd className="kbd-hint">Space</kbd> Play/Pause</div>
+              <div><kbd className="kbd-hint">←/→</kbd> Skip 10s</div>
+              <div><kbd className="kbd-hint">↑/↓</kbd> Speed up/down</div>
+              <div><kbd className="kbd-hint">Esc</kbd> Stop</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {sidebarOpen && (
+        <div className="mobile-drawer-overlay visible" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Pricing modal (explicit subscribe) */}
       <PricingModal
         open={showPricing}
-        initialPlan={"pro"}
-        initialBilling={"monthly"}
         email={email}
-        onEmailChange={(e: string) => setEmail(e)}
         onClose={() => setShowPricing(false)}
-        onCheckout={(p, b, em) =>
-          startCheckout(p as any, b as any, em || email)
-        }
         context={modalContext}
       />
+
+      {/* First-time walkthrough tour */}
+      <Walkthrough />
     </div>
   );
 }

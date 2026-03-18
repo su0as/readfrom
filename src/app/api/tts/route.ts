@@ -138,7 +138,7 @@ function chunkBySentences(
   tokens: { t: "word" | "sep"; v: string; wi?: number }[],
   totalWords: number,
 ) {
-  const MAX_BYTES = 4800;
+  const MAX_BYTES = 4900;
   const sents = sentenceRanges(tokens);
   // If we failed to detect sentences (e.g., no punctuation), fall back to word/byte chunking
   if (sents.length === 0) {
@@ -195,7 +195,7 @@ function chunkByBytes(
   totalWords: number,
 ) {
   const chunks: { startWord: number; endWord: number; ssml: string }[] = [];
-  const MAX_BYTES = 4800; // stay below API 5000-byte limit (accounts for closing tag)
+  const MAX_BYTES = 4900; // stay below API 5000-byte limit (accounts for closing tag)
   const speakOpen = "<speak>";
   const speakClose = "</speak>";
   const openBytes = Buffer.byteLength(speakOpen);
@@ -275,7 +275,7 @@ function fallbackVoiceForLanguage(lang: string) {
 
 const DEBUG_TTS = !!process.env.DEBUG_TTS;
 
-const PREVIEW_SECONDS_DEFAULT = Number(process.env.PREVIEW_SECONDS || "30");
+const PREVIEW_SECONDS_DEFAULT = Number(process.env.PREVIEW_SECONDS || "60");
 
 export async function POST(req: NextRequest) {
   if (req.method !== "POST")

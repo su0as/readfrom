@@ -1,14 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Spectral } from "next/font/google";
+import { Spectral, Inter } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import Link from "next/link";
 
 const spectral = Spectral({
   variable: "--font-spectral",
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
+});
+
+const inter = Inter({
+  variable: "--font-ui",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 const site = (
@@ -18,27 +23,35 @@ const site = (
 export const metadata: Metadata = {
   metadataBase: new URL(site),
   title: {
-    default: "ReadFrom",
-    template: "%s • ReadFrom",
+    default: "ReadTo — Turn Any Text Into a Natural Audio Experience",
+    template: "%s • ReadTo",
   },
   description:
-    "ReadFrom – focused text-to-speech reader with word-level highlighting.",
-  keywords: ["text to speech", "tts", "reader", "audioreader", "accessibility"],
-  authors: [{ name: "ReadFrom" }],
+    "Paste any text, article, or ebook and listen with natural AI voices and word-by-word highlighting. Free preview, affordable plans.",
+  keywords: [
+    "text to speech",
+    "tts",
+    "reader",
+    "audioreader",
+    "accessibility",
+    "article reader",
+    "listen to articles",
+  ],
+  authors: [{ name: "ReadTo" }],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     url: "/",
-    siteName: "ReadFrom",
-    title: "ReadFrom",
+    siteName: "ReadTo",
+    title: "ReadTo — Turn Any Text Into a Natural Audio Experience",
     description:
-      "High-quality text-to-speech reader with word-level highlighting.",
+      "Paste any text, article, or ebook and listen with natural AI voices and word-by-word highlighting.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ReadFrom",
+    title: "ReadTo — Turn Any Text Into a Natural Audio Experience",
     description:
-      "High-quality text-to-speech reader with word-level highlighting.",
+      "Paste any text, article, or ebook and listen with natural AI voices and word-by-word highlighting.",
   },
 };
 
@@ -49,7 +62,6 @@ export const viewport: Viewport = {
   themeColor: "#111111",
 };
 
-// Force dynamic rendering for the root segment to avoid prerendering the client-only reader page.
 export const dynamic = "force-dynamic";
 
 export default function RootLayout({
@@ -60,58 +72,30 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: "ReadFrom",
+    name: "ReadTo",
     applicationCategory: "MultimediaApplication",
     operatingSystem: "Web",
     url: site,
     description:
-      "High-quality text-to-speech reader with word-level highlighting.",
-    offers: { "@type": "Offer", price: "9.99", priceCurrency: "USD" },
+      "Paste any text, article, or ebook and listen with natural AI voices and word-by-word highlighting.",
+    offers: {
+      "@type": "AggregateOffer",
+      lowPrice: "2.99",
+      highPrice: "49.99",
+      priceCurrency: "USD",
+    },
   } as const;
   return (
     <html lang="en" className="theme-white" suppressHydrationWarning>
       <body
-        className={`${spectral.variable} antialiased`}
+        className={`${spectral.variable} ${inter.variable} antialiased`}
         suppressHydrationWarning
       >
-        <header className="app-header" style={{ padding: "12px 16px" }}>
-          <Link
-            href="/"
-            className="logo"
-            aria-label="readto home"
-            style={{ textDecoration: "none" }}
-          >
-            <span
-              className="read"
-              style={{
-                textTransform: "lowercase",
-                fontWeight: 400,
-                fontFamily: "var(--font-spectral)",
-                fontSize: 20,
-              }}
-            >
-              read
-            </span>
-            <span
-              className="to"
-              style={{
-                textTransform: "lowercase",
-                fontWeight: 400,
-                fontFamily: "var(--font-spectral)",
-                fontSize: 20,
-                marginLeft: 2,
-              }}
-            >
-              to
-            </span>
-          </Link>
-        </header>
         {children}
         <Analytics />
         <SpeedInsights />
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </body>
