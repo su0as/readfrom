@@ -38,6 +38,10 @@ export const metadata: Metadata = {
     "listen to articles",
   ],
   authors: [{ name: "ReadTo" }],
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
